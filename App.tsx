@@ -332,3 +332,12 @@ const App: React.FC = () => {
 
 export default App;
     addHistory({ type: 'chat', detail: 'message', timestamp: new Date().toISOString() });
+  useEffect(() => {
+    try {
+      const ga = (window as any).gtag;
+      const id = (window as any).GA_MEASUREMENT_ID || 'G-70YJGKX4V1';
+      if (typeof ga === 'function') {
+        ga('config', id, { page_title: document.title, page_path: window.location.pathname });
+      }
+    } catch {}
+  }, [viewMode]);
