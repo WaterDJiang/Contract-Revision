@@ -121,6 +121,11 @@ const SettingsModal: React.FC = () => {
                 {t.settings.systemManaged}
               </div>
               <p className="text-[10px] text-zinc-500">{t.settings.glmNote}</p>
+              {(!(import.meta as any).env?.VITE_GLM_API_KEY) && (
+                <div className="text-[10px] text-amber-300 bg-amber-900/20 border border-amber-600/30 rounded px-2 py-1">
+                  GLM 环境密钥未配置：请在部署环境设置 VITE_GLM_API_KEY
+                </div>
+              )}
             </div>
           )}
 

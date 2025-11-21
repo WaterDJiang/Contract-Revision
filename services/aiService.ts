@@ -99,7 +99,7 @@ export const processUserRequest = async (
 
   // --- GOOGLE GENAI IMPLEMENTATION ---
   if (settings.provider === 'google') {
-    const apiKey = settings.keys?.google || process.env.GEMINI_API_KEY;
+    const apiKey = settings.keys?.google || (typeof import.meta !== 'undefined' ? (import.meta as any).env?.VITE_GEMINI_API_KEY : undefined) || process.env.GEMINI_API_KEY;
     if (!apiKey) {
       throw new Error("Google API Key is missing. Please configure it in Settings.");
     }
@@ -140,13 +140,13 @@ export const processUserRequest = async (
 
     // GLM Specific Configuration (Zhipu AI)
     if (settings.provider === 'glm') {
-       apiKey = process.env.GLM_API_KEY || '';
+       apiKey = (typeof import.meta !== 'undefined' ? (import.meta as any).env?.VITE_GLM_API_KEY : undefined) || process.env.GLM_API_KEY || '';
        baseUrl = 'https://open.bigmodel.cn/api/paas/v4';
     } else if (settings.provider === 'openai') {
-       apiKey = settings.keys?.openai || process.env.OPENAI_API_KEY || '';
+       apiKey = settings.keys?.openai || (typeof import.meta !== 'undefined' ? (import.meta as any).env?.VITE_OPENAI_API_KEY : undefined) || process.env.OPENAI_API_KEY || '';
        baseUrl = baseUrl || 'https://api.openai.com/v1';
     } else if (settings.provider === 'custom') {
-       apiKey = settings.keys?.custom || process.env.CUSTOM_API_KEY || '';
+       apiKey = settings.keys?.custom || (typeof import.meta !== 'undefined' ? (import.meta as any).env?.VITE_CUSTOM_API_KEY : undefined) || process.env.CUSTOM_API_KEY || '';
     }
 
     if (!apiKey) throw new Error(`API Key is missing for provider: ${settings.provider}.`);
