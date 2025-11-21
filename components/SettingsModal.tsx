@@ -2,14 +2,16 @@
 import React, { useState, useEffect } from 'react';
 import { IconX, IconSettings, IconKey } from './Icons';
 import { useSettings, AIProvider } from '../contexts/SettingsContext';
+import { setPassphrase, isSecureEnabled } from '../utils/secureStorage';
 import { useLanguage } from '../contexts/LanguageContext';
 
 const SettingsModal: React.FC = () => {
   const { settings, updateSettings, isSettingsOpen, setIsSettingsOpen } = useSettings();
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   
   const [localSettings, setLocalSettings] = useState(settings);
   const [showKey, setShowKey] = useState(false);
+  const [passphrase, setPassphraseInput] = useState('');
 
   // Update local state when modal opens
   useEffect(() => {
@@ -20,7 +22,8 @@ const SettingsModal: React.FC = () => {
 
   if (!isSettingsOpen) return null;
 
-  const handleSave = () => {
+  const handleSave = async () => {
+    if (passphrase.trim()) await setPassphrase(passphrase.trim());
     updateSettings(localSettings);
     setIsSettingsOpen(false);
   };
@@ -64,6 +67,17 @@ const SettingsModal: React.FC = () => {
         </div>
 
         <div className="space-y-5">
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-zinc-400">{language === 'zh' ? '本地加密口令（选填）' : 'Local encryption passphrase (optional)'}</label>
+            <input 
+              type="password"
+              value={passphrase}
+              onChange={(e) => setPassphraseInput(e.target.value)}
+              placeholder={language === 'zh' ? '设置后本地密钥将使用AES加密' : 'AES-GCM encrypt local keys when set'}
+              className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2.5 text-sm text-zinc-200 focus:ring-1 focus:ring-brand-500 focus:border-brand-500 outline-none"
+            />
+            <p className="text-[10px] text-zinc-500">{language === 'zh' ? (isSecureEnabled() ? '已启用加密' : '未启用加密') : (isSecureEnabled() ? 'Encryption enabled' : 'Encryption not enabled')}</p>
+          </div>
           {/* Provider Selection */}
           <div className="space-y-2">
             <label className="text-sm font-medium text-zinc-400">{t.settings.providerLabel}</label>

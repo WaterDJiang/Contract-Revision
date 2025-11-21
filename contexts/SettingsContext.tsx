@@ -1,6 +1,6 @@
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { encryptKey, decryptKey } from '../utils/secureStorage';
+import { encryptKey, decryptKey, setPassphrase, isSecureEnabled } from '../utils/secureStorage';
 
 export type AIProvider = 'google' | 'openai' | 'glm' | 'custom';
 
@@ -27,8 +27,8 @@ interface SettingsContextType {
 }
 
 const ENV: any = typeof import.meta !== 'undefined' ? (import.meta as any).env || {} : {};
-const defaultProvider: AIProvider = ENV.PROD ? 'glm' : 'google';
-const defaultModelName = defaultProvider === 'glm' ? 'glm-4.6' : 'gemini-2.5-flash';
+const defaultProvider: AIProvider = 'glm';
+const defaultModelName = 'glm-4.6';
 const DEFAULT_SETTINGS: ModelSettings = {
   provider: defaultProvider,
   keys: {
@@ -51,62 +51,68 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
   useEffect(() => {
-    const savedV2 = localStorage.getItem(SETTINGS_KEY_V2);
-    if (savedV2) {
-      try {
-        const parsed = JSON.parse(savedV2);
-        const keys: ProviderKeys = {};
-        if (parsed.keys) {
-          for (const k of ['google', 'openai', 'glm', 'custom']) {
-            if (parsed.keys[k]) keys[k as keyof ProviderKeys] = decryptKey(parsed.keys[k]);
+    const load = async () => {
+      const savedV2 = localStorage.getItem(SETTINGS_KEY_V2);
+      if (savedV2) {
+        try {
+          const parsed = JSON.parse(savedV2);
+          const keys: ProviderKeys = {};
+          if (parsed.keys) {
+            for (const k of ['google', 'openai', 'glm', 'custom']) {
+              const val = parsed.keys[k];
+              if (val) keys[k as keyof ProviderKeys] = await decryptKey(val);
+            }
           }
-        }
-        const merged = { ...DEFAULT_SETTINGS, ...parsed, keys: { ...DEFAULT_SETTINGS.keys, ...keys } };
-        setSettings(merged);
-        return;
-      } catch {}
-    }
-
-    const savedV1 = localStorage.getItem(SETTINGS_KEY_V1);
-    if (savedV1) {
-      try {
-        const parsed = JSON.parse(savedV1);
-        const apiKey = parsed.apiKey ? decryptKey(parsed.apiKey) : '';
-        const provider: AIProvider = parsed.provider || DEFAULT_SETTINGS.provider;
-        const keys: ProviderKeys = {};
-        if (apiKey) keys[provider] = apiKey;
-        const merged = { ...DEFAULT_SETTINGS, ...parsed, keys } as ModelSettings;
-        setSettings(merged);
-        const toSave = {
-          ...merged,
-          keys: Object.fromEntries(
-            Object.entries(merged.keys).map(([p, v]) => [p, v ? encryptKey(v) : v])
-          )
-        };
-        localStorage.setItem(SETTINGS_KEY_V2, JSON.stringify(toSave));
-      } catch (e) {
-        console.error('Failed to migrate settings', e);
+          const merged = { ...DEFAULT_SETTINGS, ...parsed, keys: { ...DEFAULT_SETTINGS.keys, ...keys } };
+          setSettings(merged);
+          return;
+        } catch {}
       }
-    } else {
-      setSettings(DEFAULT_SETTINGS);
-    }
+
+      const savedV1 = localStorage.getItem(SETTINGS_KEY_V1);
+      if (savedV1) {
+        try {
+          const parsed = JSON.parse(savedV1);
+          const apiKey = parsed.apiKey ? await decryptKey(parsed.apiKey) : '';
+          const provider: AIProvider = parsed.provider || DEFAULT_SETTINGS.provider;
+          const keys: ProviderKeys = {};
+          if (apiKey) keys[provider] = apiKey;
+          const merged = { ...DEFAULT_SETTINGS, ...parsed, keys } as ModelSettings;
+          setSettings(merged);
+          const toSave = {
+            ...merged,
+            keys: Object.fromEntries(
+              await Promise.all(
+                Object.entries(merged.keys).map(async ([p, v]) => [p, v ? await encryptKey(v) : v])
+              )
+            )
+          };
+          localStorage.setItem(SETTINGS_KEY_V2, JSON.stringify(toSave));
+        } catch (e) {
+          console.error('Failed to migrate settings', e);
+        }
+      } else {
+        setSettings(DEFAULT_SETTINGS);
+      }
+    };
+    load();
   }, []);
 
   const updateSettings = (newSettings: Partial<ModelSettings>) => {
     setSettings(prev => {
       const updated = { ...prev, ...newSettings };
-      const keys: ProviderKeys = {};
-      for (const k of ['google', 'openai', 'glm', 'custom']) {
-        const val = updated.keys?.[k as keyof ProviderKeys];
-        if (val) keys[k as keyof ProviderKeys] = val;
-      }
-      const toSave = {
-        ...updated,
-        keys: Object.fromEntries(
-          Object.entries(keys).map(([p, v]) => [p, v ? encryptKey(v) : v])
-        )
-      };
-      localStorage.setItem(SETTINGS_KEY_V2, JSON.stringify(toSave));
+      (async () => {
+        const keys: ProviderKeys = {};
+        for (const k of ['google', 'openai', 'glm', 'custom']) {
+          const val = updated.keys?.[k as keyof ProviderKeys];
+          if (val) keys[k as keyof ProviderKeys] = val;
+        }
+        const encPairs = await Promise.all(
+          Object.entries(keys).map(async ([p, v]) => [p, v ? await encryptKey(v) : v])
+        );
+        const toSave = { ...updated, keys: Object.fromEntries(encPairs) };
+        localStorage.setItem(SETTINGS_KEY_V2, JSON.stringify(toSave));
+      })();
       return updated;
     });
   };
