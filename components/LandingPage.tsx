@@ -1,18 +1,21 @@
 
 import React, { useRef } from 'react';
-import { IconRobot, IconShield, IconPen, IconDownload, IconUpload, IconFile, IconGlobe, IconCompare } from './Icons';
+import { IconRobot, IconShield, IconPen, IconDownload, IconUpload, IconFile, IconGlobe, IconCompare, IconSettings, IconSend } from './Icons';
 import { parseFile } from '../utils/fileHelpers';
 import { useLanguage } from '../contexts/LanguageContext';
+import { useSettings } from '../contexts/SettingsContext';
 
 interface LandingPageProps {
   onNewContract: () => void;
   onImportContract: (content: string) => void;
   onOpenCompare: () => void;
+  onOpenSuggest: () => void;
 }
 
-const LandingPage: React.FC<LandingPageProps> = ({ onNewContract, onImportContract, onOpenCompare }) => {
+const LandingPage: React.FC<LandingPageProps> = ({ onNewContract, onImportContract, onOpenCompare, onOpenSuggest }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { t, language, setLanguage } = useLanguage();
+  const { setIsSettingsOpen } = useSettings();
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -68,18 +71,36 @@ const LandingPage: React.FC<LandingPageProps> = ({ onNewContract, onImportContra
         <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <div className="w-8 h-8 bg-gradient-to-br from-brand-500 to-indigo-600 rounded-lg flex items-center justify-center shadow-lg shadow-brand-500/20">
-               <span className="text-white font-bold text-lg">W</span>
+               <span className="text-white font-bold text-lg">L</span>
             </div>
-            <span className="font-semibold text-lg tracking-tight">Wattter Lex</span>
+            <span className="font-semibold text-lg tracking-tight">LexAI</span>
           </div>
           
-          <button 
-            onClick={toggleLanguage}
-            className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-zinc-900 border border-zinc-800 text-xs text-zinc-400 hover:text-zinc-200 transition-colors"
-          >
-            <IconGlobe className="w-4 h-4" />
-            {language === 'en' ? 'English' : '中文'}
-          </button>
+          <div className="flex items-center gap-2">
+            <button 
+              onClick={toggleLanguage}
+              className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-zinc-900 border border-zinc-800 text-xs text-zinc-400 hover:text-zinc-200 transition-colors"
+            >
+              <IconGlobe className="w-4 h-4" />
+              {language === 'en' ? 'English' : '中文'}
+            </button>
+            <button 
+              onClick={() => setIsSettingsOpen(true)}
+              className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-zinc-900 border border-zinc-800 text-xs text-zinc-400 hover:text-zinc-200 transition-colors"
+              title={t.settings.title}
+            >
+              <IconSettings className="w-4 h-4" />
+              {t.settings.title}
+            </button>
+            <button
+              onClick={onOpenSuggest}
+              className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-brand-600/20 border border-brand-500/40 text-xs text-brand-300 hover:text-brand-100 hover:bg-brand-600/30 transition-colors"
+              title={t.suggest.title}
+            >
+              <IconSend className="w-4 h-4" />
+              {t.suggest.title}
+            </button>
+          </div>
         </div>
       </nav>
 

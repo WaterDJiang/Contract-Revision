@@ -40,15 +40,47 @@ export const processUserRequest = async (
 
   const systemPrompt = `
     You are an expert legal aide and contract drafter.
-    ${language === 'zh' ? "IMPORTANT: Output your response in CHINESE (Simplified). Use Chinese legal terminology." : "Output in English."}
+    Output language: if language == 'zh', use Chinese (Simplified); otherwise, use English.
+
+    Advisory Requirements:
+    1. Act as a professional legal advisor and proactively flag missing clauses or risks with actionable suggestions.
+    2. Keep advice professional but explain in plain, accessible language so non-experts understand.
+    3. Treat the user as a beginner and guide them step-by-step to complete their contract tasks.
+
+    Contract Generation & Review Checklist:
+    - Parties and definitions: use precise legal names, authority, and clear definitions.
+    - Scope/services: deliverables, milestones, acceptance criteria, change control.
+    - Commercial terms: pricing model, payment terms, taxes, late fees, invoicing cadence.
+    - Term/termination: initial term, renewal, termination for cause/convenience, suspension.
+    - Intellectual property: ownership of work product, background/foreground IP, license scope.
+    - Confidentiality & data protection: PII/PHI handling, security measures, breach notification.
+    - Warranties & disclaimers: performance, fitness, domain-specific assurances.
+    - Liability allocation: limitation of liability caps, exclusions, indemnities, remedies.
+    - Compliance: export controls, sanctions, privacy laws, anti-bribery, industry regulations.
+    - Service levels & support: SLAs, uptime, response times, maintenance windows.
+    - Subcontracting/assignment: restrictions, consent requirements, audit/inspection rights.
+    - Governing law, jurisdiction, dispute resolution: venue, arbitration/mediation rules.
+    - Force majeure, notices, entire agreement, severability, survival of key obligations.
+    - Insurance: required coverages and evidence of insurance.
+    - Privacy/DPA: processing roles, cross-border transfers, subprocessors, data subject rights.
+    - Third-party/open-source components: licensing and compliance.
+    - Execution: effective date, counterparts, electronic signatures.
+
+    Risk & Issue Detection:
+    - Flag missing clauses, ambiguous terms, conflicting obligations, and non-standard positions.
+    - Highlight unlimited liability, broad IP assignments, perpetual/irrevocable licenses, unilateral change clauses, auto-renewal traps.
+
+    Clarification & Guidance:
+    - Ask targeted questions to fill gaps (e.g., governing law, IP ownership, SLA needs).
+    - Provide step-by-step guidance to help the user complete their contract tasks.
 
     ${contextBlock}
 
     User Instruction: "${userInstruction}"
-
+    
     Conversation Context:
     ${conversationHistory.slice(-5).join('\n')}
-
+    
     Your Task:
     Determine if the user wants to MODIFY the contract (rewrite/edit) or ANALYZE it (ask questions/risks/summarize).
     
@@ -67,8 +99,7 @@ export const processUserRequest = async (
 
   // --- GOOGLE GENAI IMPLEMENTATION ---
   if (settings.provider === 'google') {
-    // Fallback to process.env.API_KEY if user hasn't set one
-    const apiKey = settings.apiKey || process.env.API_KEY;
+    const apiKey = settings.keys?.google || process.env.GEMINI_API_KEY;
     if (!apiKey) {
       throw new Error("Google API Key is missing. Please configure it in Settings.");
     }
@@ -104,22 +135,21 @@ export const processUserRequest = async (
   
   // --- GLM (Backend Configured) / OPENAI / CUSTOM IMPLEMENTATION ---
   else {
-    let apiKey = settings.apiKey;
+    let apiKey = '';
     let baseUrl = settings.baseUrl;
 
     // GLM Specific Configuration (Zhipu AI)
     if (settings.provider === 'glm') {
-       // Use GLM specific env key first, then general API_KEY
-       apiKey = process.env.GLM_API_KEY || process.env.API_KEY || '';
-       // Zhipu / GLM OpenAI compatible endpoint
+       apiKey = process.env.GLM_API_KEY || '';
        baseUrl = 'https://open.bigmodel.cn/api/paas/v4';
     } else if (settings.provider === 'openai') {
+       apiKey = settings.keys?.openai || process.env.OPENAI_API_KEY || '';
        baseUrl = baseUrl || 'https://api.openai.com/v1';
+    } else if (settings.provider === 'custom') {
+       apiKey = settings.keys?.custom || process.env.CUSTOM_API_KEY || '';
     }
 
-    if (!apiKey) {
-      throw new Error(`API Key is missing for provider: ${settings.provider}.`);
-    }
+    if (!apiKey) throw new Error(`API Key is missing for provider: ${settings.provider}.`);
     if (!baseUrl) throw new Error("Base URL is required.");
 
     try {
@@ -130,7 +160,7 @@ export const processUserRequest = async (
           'Authorization': `Bearer ${apiKey}`
         },
         body: JSON.stringify({
-          model: settings.modelName || (settings.provider === 'glm' ? 'glm-4' : 'gpt-4-turbo'),
+          model: settings.modelName || (settings.provider === 'glm' ? 'glm-4.6' : 'gpt-4-turbo'),
           messages: [
             { role: "system", content: "You are a helpful legal assistant. Output valid JSON only." },
             { role: "user", content: systemPrompt }

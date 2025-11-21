@@ -78,7 +78,23 @@ export const translations = {
         glm: "GLM-4 (Backend)",
         custom: "Custom"
       },
-      systemManaged: "Managed by System Environment"
+      systemManaged: "Managed by System Environment",
+      glmNote: "GLM models are available by default at no cost. To use other providers, enter your own API key. Keys are stored locally in your browser and never uploaded to our servers."
+    },
+    suggest: {
+      title: "Submit a Suggestion",
+      contentLabel: "Suggestion",
+      contentPlaceholder: "Describe your idea or improvement...",
+      nameLabel: "Your Name (Optional)",
+      emailLabel: "Email (Optional)",
+      phoneLabel: "Phone (Optional)",
+      submit: "Submit",
+      submitting: "Submitting...",
+      cancel: "Cancel",
+      requiredError: "Suggestion content is required.",
+      envMissing: "Webhook environment variables are missing.",
+      success: "Suggestion sent successfully. Thank you!",
+      failed: "Failed to submit"
     },
     compare: {
       title: "Compare Contracts",
@@ -87,6 +103,14 @@ export const translations = {
       upload: "Upload File",
       compareBtn: "Start Comparison",
       cancel: "Cancel"
+    }
+    ,
+    history: {
+      title: "Local History",
+      clear: "Clear",
+      empty: "No history yet",
+      loading: "Loading...",
+      count: "Items"
     }
   },
   zh: {
@@ -165,7 +189,23 @@ export const translations = {
         glm: "GLM-4 (后台配置)",
         custom: "自定义"
       },
-      systemManaged: "由系统环境统一管理"
+      systemManaged: "由系统环境统一管理",
+      glmNote: "系统默认免费提供 GLM 模型。如需使用其他模型，请自行填入对应提供商的 API 密钥。所有密钥仅保存在本地浏览器，不会上传到服务器，可以放心使用。"
+    },
+    suggest: {
+      title: "提交建议",
+      contentLabel: "建议内容",
+      contentPlaceholder: "请输入您的意见或改进建议...",
+      nameLabel: "姓名（选填）",
+      emailLabel: "邮箱（选填）",
+      phoneLabel: "手机号（选填）",
+      submit: "提交",
+      submitting: "提交中...",
+      cancel: "取消",
+      requiredError: "建议内容为必填项。",
+      envMissing: "Webhook 环境变量缺失。",
+      success: "建议提交成功，感谢反馈！",
+      failed: "提交失败"
     },
     compare: {
       title: "合同比对",
@@ -174,6 +214,14 @@ export const translations = {
       upload: "上传文件",
       compareBtn: "开始比对",
       cancel: "取消"
+    }
+    ,
+    history: {
+      title: "本地历史",
+      clear: "清空",
+      empty: "暂无历史记录",
+      loading: "加载中...",
+      count: "条目"
     }
   }
 };

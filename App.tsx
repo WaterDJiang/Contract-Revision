@@ -5,9 +5,12 @@ import ChatPanel from './components/ChatPanel';
 import EditorPanel from './components/EditorPanel';
 import LandingPage from './components/LandingPage';
 import SettingsModal from './components/SettingsModal';
+import SuggestModal from './components/SuggestModal';
 import CompareModal from './components/CompareModal';
+import HistoryModal from './components/HistoryModal';
 import { IconFile, IconHistory, IconSettings, IconGitMerge } from './components/Icons';
 import { processUserRequest } from './services/aiService';
+import { addHistory } from './utils/historyStore';
 import { useLanguage } from './contexts/LanguageContext';
 import { useSettings } from './contexts/SettingsContext';
 
@@ -30,6 +33,8 @@ const App: React.FC = () => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
   const [isCompareModalOpen, setIsCompareModalOpen] = useState(false);
+  const [isHistoryOpen, setIsHistoryOpen] = useState(false);
+  const [isSuggestModalOpen, setIsSuggestModalOpen] = useState(false);
 
   const saveToStorage = (content: string) => {
     try {
@@ -60,6 +65,7 @@ const App: React.FC = () => {
       sender: Sender.AI,
       timestamp: new Date(),
     }]);
+    addHistory({ type: 'new', detail: 'workspace', timestamp: new Date().toISOString() });
     setViewMode('editor');
   };
 
@@ -73,6 +79,7 @@ const App: React.FC = () => {
       sender: Sender.AI,
       timestamp: new Date(),
     }]);
+    addHistory({ type: 'import', detail: 'file', timestamp: new Date().toISOString() });
     setViewMode('editor');
   };
 
@@ -81,7 +88,8 @@ const App: React.FC = () => {
     setContractMarkdown(revised);
     setEditorMode(EditorMode.DIFF);
     setViewMode('editor');
-    setMessages([{
+    addHistory({ type: 'compare', detail: 'contracts', timestamp: new Date().toISOString() });
+    setMessages([{ 
       id: 'compare-welcome',
       text: t.app.welcomeCompare,
       sender: Sender.AI,
@@ -179,6 +187,7 @@ const App: React.FC = () => {
     if (proposedMarkdown) {
       setContractMarkdown(proposedMarkdown);
       saveToStorage(proposedMarkdown);
+      addHistory({ type: 'apply', detail: 'changes', timestamp: new Date().toISOString() });
       setProposedMarkdown(null);
       setEditorMode(EditorMode.VIEW);
       setMessages(prev => [...prev, {
@@ -191,6 +200,7 @@ const App: React.FC = () => {
   }, [proposedMarkdown, t]);
 
   const handleRejectChange = useCallback(() => {
+    addHistory({ type: 'reject', detail: 'changes', timestamp: new Date().toISOString() });
     setProposedMarkdown(null);
     setEditorMode(EditorMode.VIEW);
     setMessages(prev => [...prev, {
@@ -216,17 +226,15 @@ const App: React.FC = () => {
           onClose={() => setIsCompareModalOpen(false)} 
           onCompare={handleCompareContract} 
         />
+        <HistoryModal isOpen={isHistoryOpen} onClose={() => setIsHistoryOpen(false)} />
         <LandingPage 
           onNewContract={handleNewContract} 
           onImportContract={handleImportContract} 
           onOpenCompare={() => setIsCompareModalOpen(true)}
+          onOpenSuggest={() => setIsSuggestModalOpen(true)}
         />
-        <button 
-           onClick={() => setIsSettingsOpen(true)}
-           className="fixed top-4 left-4 p-2 z-50 text-zinc-600 hover:text-zinc-300 transition-colors"
-        >
-          <IconSettings className="w-5 h-5" />
-        </button>
+        <SuggestModal isOpen={isSuggestModalOpen} onClose={() => setIsSuggestModalOpen(false)} />
+        
       </>
     );
   }
@@ -239,34 +247,45 @@ const App: React.FC = () => {
         onClose={() => setIsCompareModalOpen(false)} 
         onCompare={handleCompareContract} 
       />
+      <HistoryModal isOpen={isHistoryOpen} onClose={() => setIsHistoryOpen(false)} />
+      <SuggestModal isOpen={isSuggestModalOpen} onClose={() => setIsSuggestModalOpen(false)} />
       
       {/* Sidebar */}
       <div className="w-16 border-r border-zinc-800 flex flex-col items-center py-6 gap-6 bg-zinc-900 z-20 justify-between">
         <div className="flex flex-col items-center gap-6 w-full">
-          <button onClick={() => setViewMode('landing')} className="w-10 h-10 bg-gradient-to-br from-brand-500 to-indigo-600 rounded-xl flex items-center justify-center shadow-lg shadow-brand-500/20 hover:scale-105 transition-transform">
+          <button onClick={() => setViewMode('landing')} title={language === 'zh' ? '返回首页' : 'Home'} className="w-10 h-10 bg-gradient-to-br from-brand-500 to-indigo-600 rounded-xl flex items-center justify-center shadow-lg shadow-brand-500/20 hover:scale-105 transition-transform">
             <span className="text-white font-bold">L</span>
           </button>
           <div className="flex flex-col gap-4 w-full items-center">
-             <button className="p-3 rounded-xl bg-zinc-800 text-zinc-100 hover:bg-zinc-700 transition-colors"><IconFile className="w-5 h-5" /></button>
+             <div className="relative group">
+               <button title={language === 'zh' ? '文件' : 'Files'} className="p-3 rounded-xl bg-zinc-800 text-zinc-100 hover:bg-zinc-700 transition-colors"><IconFile className="w-5 h-5" /></button>
+               <span className="pointer-events-none absolute left-12 top-1/2 -translate-y-1/2 px-2 py-1 rounded bg-zinc-800 border border-zinc-700 text-[11px] text-zinc-300 opacity-0 group-hover:opacity-100 whitespace-nowrap">{language === 'zh' ? '文件' : 'Files'}</span>
+             </div>
              <button 
                onClick={() => setIsCompareModalOpen(true)}
                className={`p-3 rounded-xl transition-colors ${comparisonMarkdown ? 'bg-brand-900/30 text-brand-400 border border-brand-500/30' : 'text-zinc-500 hover:bg-zinc-800 hover:text-zinc-300'}`}
-               title="Compare Contracts"
+               title={language === 'zh' ? '合同比对' : 'Compare Contracts'}
              >
                <IconGitMerge className="w-5 h-5" />
              </button>
-             <button className="p-3 rounded-xl text-zinc-500 hover:bg-zinc-800/50 hover:text-zinc-300 transition-colors"><IconHistory className="w-5 h-5" /></button>
+             <div className="relative group">
+               <button onClick={() => setIsHistoryOpen(true)} title={language === 'zh' ? '历史' : 'History'} className="p-3 rounded-xl text-zinc-500 hover:bg-zinc-800/50 hover:text-zinc-300 transition-colors"><IconHistory className="w-5 h-5" /></button>
+               <span className="pointer-events-none absolute left-12 top-1/2 -translate-y-1/2 px-2 py-1 rounded bg-zinc-800 border border-zinc-700 text-[11px] text-zinc-300 opacity-0 group-hover:opacity-100 whitespace-nowrap">{language === 'zh' ? '历史' : 'History'}</span>
+             </div>
           </div>
         </div>
 
         <div className="flex flex-col items-center gap-4 mb-4">
-           <button 
-             onClick={() => setIsSettingsOpen(true)}
-             className="p-3 rounded-xl text-zinc-500 hover:bg-zinc-800 hover:text-brand-400 transition-colors"
-             title="Settings"
-           >
-             <IconSettings className="w-5 h-5" />
-           </button>
+          <div className="relative group">
+            <button 
+              onClick={() => setIsSettingsOpen(true)}
+              className="p-3 rounded-xl text-zinc-500 hover:bg-zinc-800 hover:text-brand-400 transition-colors"
+              title={t.settings.title}
+            >
+              <IconSettings className="w-5 h-5" />
+            </button>
+            <span className="pointer-events-none absolute left-12 top-1/2 -translate-y-1/2 px-2 py-1 rounded bg-zinc-800 border border-zinc-700 text-[11px] text-zinc-300 opacity-0 group-hover:opacity-100 whitespace-nowrap">{t.settings.title}</span>
+          </div>
         </div>
       </div>
 
@@ -299,3 +318,4 @@ const App: React.FC = () => {
 };
 
 export default App;
+    addHistory({ type: 'chat', detail: 'message', timestamp: new Date().toISOString() });

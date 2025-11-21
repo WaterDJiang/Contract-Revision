@@ -27,11 +27,22 @@ const SettingsModal: React.FC = () => {
 
   const handleProviderChange = (provider: AIProvider) => {
     let modelName = localSettings.modelName;
-    if (provider === 'google') modelName = 'gemini-2.5-flash';
-    else if (provider === 'glm') modelName = 'glm-4';
-    else if (provider === 'openai') modelName = 'gpt-4';
+    let baseUrl = localSettings.baseUrl;
+    if (provider === 'google') {
+      modelName = 'gemini-2.5-flash';
+      baseUrl = '';
+    } else if (provider === 'glm') {
+      modelName = 'glm-4.6';
+      baseUrl = '';
+    } else if (provider === 'openai') {
+      modelName = 'gpt-4-turbo';
+      baseUrl = 'https://api.openai.com/v1';
+    } else {
+      modelName = 'gpt-4';
+      baseUrl = '';
+    }
 
-    setLocalSettings({ ...localSettings, provider, modelName });
+    setLocalSettings({ ...localSettings, provider, modelName, baseUrl });
   };
 
   return (
@@ -83,8 +94,14 @@ const SettingsModal: React.FC = () => {
               <div className="relative">
                 <input 
                   type={showKey ? "text" : "password"}
-                  value={localSettings.apiKey}
-                  onChange={(e) => setLocalSettings({ ...localSettings, apiKey: e.target.value })}
+                  value={localSettings.keys?.[localSettings.provider] || ''}
+                  onChange={(e) => setLocalSettings({ 
+                    ...localSettings, 
+                    keys: { 
+                      ...localSettings.keys, 
+                      [localSettings.provider]: e.target.value 
+                    } 
+                  })}
                   placeholder="sk-..."
                   className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2.5 text-sm text-zinc-200 focus:ring-1 focus:ring-brand-500 focus:border-brand-500 outline-none"
                 />
@@ -98,9 +115,12 @@ const SettingsModal: React.FC = () => {
               <p className="text-[10px] text-zinc-500">{t.settings.apiKeyNote}</p>
             </div>
           ) : (
-            <div className="p-3 bg-emerald-900/20 border border-emerald-500/30 rounded-lg text-emerald-400 text-xs flex items-center gap-2">
-               <IconKey className="w-4 h-4" />
-               {t.settings.systemManaged}
+            <div className="space-y-2">
+              <div className="p-3 bg-emerald-900/20 border border-emerald-500/30 rounded-lg text-emerald-400 text-xs flex items-center gap-2">
+                <IconKey className="w-4 h-4" />
+                {t.settings.systemManaged}
+              </div>
+              <p className="text-[10px] text-zinc-500">{t.settings.glmNote}</p>
             </div>
           )}
 
