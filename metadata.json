@@ -1,0 +1,5 @@
+{
+  "name": "Wattter Lex",
+  "description": "A legal contract generation and review workspace. AI drafts in Markdown, you edit in Rich Text. Supports .doc export.",
+  "requestFramePermissions": []
+}
