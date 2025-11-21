@@ -10,7 +10,8 @@ export const translations = {
       btnNew: "Create New Contract",
       btnImport: "Import Contract",
       btnCompare: "Compare Contracts",
-      footer: "© 2024 Wattter Lex. Powered by Google Gemini.",
+      footer: "© 2025 Wattter LexAI. Powered by Google Gemini.",
+      moreWorks: "More works on my homepage",
       features: {
         copilot: { title: "AI Co-Pilot", desc: "Draft clauses, summarize terms, and modify tone with AI." },
         risk: { title: "Risk Analysis", desc: "Identify potential risks and missing clauses instantly." },
@@ -122,6 +123,7 @@ export const translations = {
       btnImport: "导入合同",
       btnCompare: "合同比对",
       footer: "© 2024 Wattter Lex. 由 Google Gemini 提供支持。",
+      moreWorks: "更多作品，请到我的个人主页",
       features: {
         copilot: { title: "AI 助手", desc: "使用 AI 起草条款、总结术语并修改语气。" },
         risk: { title: "风险分析", desc: "即时识别潜在风险和缺失条款。" },

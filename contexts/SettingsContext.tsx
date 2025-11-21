@@ -26,11 +26,19 @@ interface SettingsContextType {
   setIsSettingsOpen: (isOpen: boolean) => void;
 }
 
+const ENV: any = typeof import.meta !== 'undefined' ? (import.meta as any).env || {} : {};
+const defaultProvider: AIProvider = ENV.PROD ? 'glm' : 'google';
+const defaultModelName = defaultProvider === 'glm' ? 'glm-4.6' : 'gemini-2.5-flash';
 const DEFAULT_SETTINGS: ModelSettings = {
-  provider: 'google',
-  keys: { google: process.env.GEMINI_API_KEY || '' },
+  provider: defaultProvider,
+  keys: {
+    google: (process.env.GEMINI_API_KEY as string) || (ENV.VITE_GEMINI_API_KEY as string) || '',
+    openai: (process.env.OPENAI_API_KEY as string) || (ENV.VITE_OPENAI_API_KEY as string) || '',
+    glm: (process.env.GLM_API_KEY as string) || (ENV.VITE_GLM_API_KEY as string) || '',
+    custom: (process.env.CUSTOM_API_KEY as string) || (ENV.VITE_CUSTOM_API_KEY as string) || ''
+  },
   baseUrl: '',
-  modelName: 'gemini-2.5-flash'
+  modelName: defaultModelName
 };
 
 const SETTINGS_KEY_V1 = 'lexigen_settings_v1';

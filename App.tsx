@@ -8,7 +8,7 @@ import SettingsModal from './components/SettingsModal';
 import SuggestModal from './components/SuggestModal';
 import CompareModal from './components/CompareModal';
 import HistoryModal from './components/HistoryModal';
-import { IconFile, IconHistory, IconSettings, IconGitMerge } from './components/Icons';
+import { IconFile, IconHistory, IconSettings, IconGitMerge, IconSend } from './components/Icons';
 import { processUserRequest } from './services/aiService';
 import { addHistory } from './utils/historyStore';
 import { useLanguage } from './contexts/LanguageContext';
@@ -261,13 +261,16 @@ const App: React.FC = () => {
                <button title={language === 'zh' ? '文件' : 'Files'} className="p-3 rounded-xl bg-zinc-800 text-zinc-100 hover:bg-zinc-700 transition-colors"><IconFile className="w-5 h-5" /></button>
                <span className="pointer-events-none absolute left-12 top-1/2 -translate-y-1/2 px-2 py-1 rounded bg-zinc-800 border border-zinc-700 text-[11px] text-zinc-300 opacity-0 group-hover:opacity-100 whitespace-nowrap">{language === 'zh' ? '文件' : 'Files'}</span>
              </div>
-             <button 
-               onClick={() => setIsCompareModalOpen(true)}
-               className={`p-3 rounded-xl transition-colors ${comparisonMarkdown ? 'bg-brand-900/30 text-brand-400 border border-brand-500/30' : 'text-zinc-500 hover:bg-zinc-800 hover:text-zinc-300'}`}
-               title={language === 'zh' ? '合同比对' : 'Compare Contracts'}
-             >
-               <IconGitMerge className="w-5 h-5" />
-             </button>
+             <div className="relative group">
+               <button 
+                 onClick={() => setIsCompareModalOpen(true)}
+                 className={`p-3 rounded-xl transition-colors ${comparisonMarkdown ? 'bg-brand-900/30 text-brand-400 border border-brand-500/30' : 'text-zinc-500 hover:bg-zinc-800 hover:text-zinc-300'}`}
+                 title={language === 'zh' ? '合同比对' : 'Compare Contracts'}
+               >
+                  <IconGitMerge className="w-5 h-5" />
+               </button>
+               <span className="pointer-events-none absolute left-12 top-1/2 -translate-y-1/2 px-2 py-1 rounded bg-zinc-800 border border-zinc-700 text-[11px] text-zinc-300 opacity-0 group-hover:opacity-100 whitespace-nowrap">{language === 'zh' ? '合同比对' : 'Compare Contracts'}</span>
+             </div>
              <div className="relative group">
                <button onClick={() => setIsHistoryOpen(true)} title={language === 'zh' ? '历史' : 'History'} className="p-3 rounded-xl text-zinc-500 hover:bg-zinc-800/50 hover:text-zinc-300 transition-colors"><IconHistory className="w-5 h-5" /></button>
                <span className="pointer-events-none absolute left-12 top-1/2 -translate-y-1/2 px-2 py-1 rounded bg-zinc-800 border border-zinc-700 text-[11px] text-zinc-300 opacity-0 group-hover:opacity-100 whitespace-nowrap">{language === 'zh' ? '历史' : 'History'}</span>
@@ -285,6 +288,16 @@ const App: React.FC = () => {
               <IconSettings className="w-5 h-5" />
             </button>
             <span className="pointer-events-none absolute left-12 top-1/2 -translate-y-1/2 px-2 py-1 rounded bg-zinc-800 border border-zinc-700 text-[11px] text-zinc-300 opacity-0 group-hover:opacity-100 whitespace-nowrap">{t.settings.title}</span>
+          </div>
+          <div className="relative group">
+            <button 
+              onClick={() => setIsSuggestModalOpen(true)}
+              className="p-3 rounded-xl text-brand-300 hover:bg-brand-600/30 hover:text-brand-100 transition-colors"
+              title={t.suggest.title}
+            >
+              <IconSend className="w-5 h-5" />
+            </button>
+            <span className="pointer-events-none absolute left-12 top-1/2 -translate-y-1/2 px-2 py-1 rounded bg-zinc-800 border border-zinc-700 text-[11px] text-zinc-300 opacity-0 group-hover:opacity-100 whitespace-nowrap">{t.suggest.title}</span>
           </div>
         </div>
       </div>

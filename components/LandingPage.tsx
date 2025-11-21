@@ -177,7 +177,14 @@ const LandingPage: React.FC<LandingPageProps> = ({ onNewContract, onImportContra
 
       {/* Footer */}
       <footer className="border-t border-zinc-900 bg-zinc-950 py-12 text-center relative z-10">
-         <p className="text-zinc-600 text-sm">{t.landing.footer}</p>
+         <p className="text-zinc-600 text-sm">
+           {t.landing.footer}
+           <span className="mx-2">·</span>
+           {t.landing.moreWorks}
+           <a href="https://www.wattter.cn" target="_blank" rel="noopener noreferrer" className="ml-2 inline-flex items-center px-2 py-1 rounded-full bg-zinc-900 border border-zinc-800 text-xs text-zinc-500 hover:text-zinc-200 hover:bg-zinc-800 transition-colors">
+             wattter.cn
+           </a>
+         </p>
       </footer>
     </div>
   );
