@@ -44,6 +44,14 @@ export const convertHtmlToMarkdown = (html: string): string => {
   }
 };
 
+export const stripRedlineHtml = (html: string): string => {
+  if (!html) return '';
+  let s = html;
+  s = s.replace(/<ins[^>]*>([\s\S]*?)<\/ins>/g, '$1');
+  s = s.replace(/<del[^>]*>[\s\S]*?<\/del>/g, '');
+  return s;
+};
+
 export const normalizeMarkdown = (md: string): string => {
   if (!md) return '';
   let s = md.replace(/\r\n/g, "\n");
@@ -54,6 +62,22 @@ export const normalizeMarkdown = (md: string): string => {
   s = s.replace(/^\s*(\d+)[\).]\s+/gm, (m, n) => `${n}. `);
   s = s.replace(/^#+(\S)/gm, (m, c) => m.replace(`#${c}`, `# ${c}`));
   return s.trim();
+};
+
+export const getContractTitle = (md: string): string => {
+  if (!md) return 'Contract';
+  const lines = md.split('\n');
+  for (const line of lines) {
+    const m = line.match(/^\s*#\s*(.+)$/);
+    if (m) return m[1].trim();
+  }
+  const first = lines.find(l => l.trim().length > 0) || 'Contract';
+  return first.trim().slice(0, 80);
+};
+
+export const toFilenameBase = (title: string): string => {
+  const base = (title || 'Contract').replace(/[^\w\-\. ]+/g, '').trim().replace(/\s+/g, '_');
+  return base || 'Contract';
 };
 
 /**
@@ -78,7 +102,7 @@ export const generateDocBlob = (htmlContent: string): Blob => {
         p { margin-bottom: 1em; }
         ul, ol { margin-bottom: 1em; }
         del { color: red; text-decoration: line-through; }
-        ins { color: green; text-decoration: none; background-color: #e6fffa; }
+        ins { color: #004085; text-decoration: none; background-color: #cce5ff; border-left: 3px solid #3399ff; padding: 2px; display: block; }
       </style>
     </head>
     <body>
@@ -111,14 +135,12 @@ export const generateRedlineHtml = (originalMd: string, revisedMd: string): stri
     if (change.type === 'unchanged') {
        htmlBody += convertMarkdownToHtml(change.value);
     } else if (change.type === 'added') {
-       // Wrap added content in a span with green background
        const html = convertMarkdownToHtml(change.value);
-       // Use inline styles for maximum Word compatibility
-       htmlBody += `<div style='background-color: #ccffcc; padding: 2px;'>${html}</div>`;
+       htmlBody += `<ins style='background-color:#cce5ff;color:#004085;border-left:3px solid #3399ff;padding:2px;display:block;'>${html}</ins>`;
     } else if (change.type === 'removed') {
-       // Wrap removed content in strike-through
-       // Note: We render the raw MD text for deletion to avoid breaking layout with removed headers etc.
-       htmlBody += `<del style='color: red; text-decoration: line-through;'>${change.value}</del><br/>`;
+      // Wrap removed content in strike-through
+      // Note: We render the raw MD text for deletion to avoid breaking layout with removed headers etc.
+      htmlBody += `<del style='color: red; text-decoration: line-through;'>${change.value}</del><br/>`;
     }
   });
 

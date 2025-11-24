@@ -74,8 +74,14 @@ export const parseFile = async (file: File): Promise<string> => {
       const reader = new FileReader();
       reader.onload = (e) => {
         let content = e.target?.result as string;
-        // If HTML, convert to MD
-        if (fileName.endsWith('.html') || fileName.endsWith('.htm')) {
+        // If HTML-like or legacy Word .doc (HTML payload), convert to MD
+        if (
+          fileName.endsWith('.html') ||
+          fileName.endsWith('.htm') ||
+          fileName.endsWith('.doc') ||
+          /<\s*html[\s>]/i.test(content) ||
+          /<\s*body[\s>]/i.test(content)
+        ) {
           content = convertHtmlToMarkdown(content);
         }
         resolve(normalizeMarkdown(content));

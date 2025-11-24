@@ -21,6 +21,8 @@ type ViewMode = 'landing' | 'editor';
 const App: React.FC = () => {
   const [viewMode, setViewMode] = useState<ViewMode>('landing');
   const [contractMarkdown, setContractMarkdown] = useState<string>("");
+  const [baselineMarkdown, setBaselineMarkdown] = useState<string | null>(null);
+  const [initialBaselineMarkdown, setInitialBaselineMarkdown] = useState<string | null>(null);
   const [comparisonMarkdown, setComparisonMarkdown] = useState<string | null>(null);
   const [proposedMarkdown, setProposedMarkdown] = useState<string | null>(null);
   const [editorMode, setEditorMode] = useState<EditorMode>(EditorMode.VIEW);
@@ -49,6 +51,8 @@ const App: React.FC = () => {
       const saved = localStorage.getItem(LOCAL_STORAGE_KEY);
       if (saved) {
         setContractMarkdown(saved);
+        setBaselineMarkdown(saved);
+        setInitialBaselineMarkdown(saved);
       }
     } catch (e) {
       console.warn("Error reading from localStorage", e);
@@ -58,6 +62,8 @@ const App: React.FC = () => {
   const handleNewContract = () => {
     setContractMarkdown("");
     setComparisonMarkdown(null);
+    setBaselineMarkdown("");
+    setInitialBaselineMarkdown("");
     saveToStorage("");
     setMessages([{
       id: 'welcome',
@@ -72,6 +78,8 @@ const App: React.FC = () => {
   const handleImportContract = (content: string) => {
     setContractMarkdown(content);
     setComparisonMarkdown(null);
+    setBaselineMarkdown(content);
+    setInitialBaselineMarkdown(content);
     saveToStorage(content);
     setMessages([{
       id: 'welcome',
@@ -86,6 +94,8 @@ const App: React.FC = () => {
   const handleCompareContract = (original: string, revised: string) => {
     setComparisonMarkdown(original);
     setContractMarkdown(revised);
+    setBaselineMarkdown(revised);
+    setInitialBaselineMarkdown(revised);
     setEditorMode(EditorMode.DIFF);
     setViewMode('editor');
     addHistory({ type: 'compare', detail: 'contracts', timestamp: new Date().toISOString() });
@@ -120,9 +130,6 @@ const App: React.FC = () => {
       const history = messages.map(m => `${m.sender}: ${m.text}`);
       
       let instruction = text;
-      if (selectedContext) {
-        instruction = `CONTEXT:\n"""${selectedContext}"""\n\nREQUEST: ${text}`;
-      }
 
       const comparisonCtx = comparisonMarkdown ? { original: comparisonMarkdown, revised: contractMarkdown } : undefined;
 
@@ -132,7 +139,8 @@ const App: React.FC = () => {
         history, 
         language,
         settings,
-        comparisonCtx
+        comparisonCtx,
+        selectedContext || undefined
       );
 
       if (response.intent === 'MODIFICATION') {
@@ -187,6 +195,7 @@ const App: React.FC = () => {
     if (proposedMarkdown) {
       setContractMarkdown(proposedMarkdown);
       saveToStorage(proposedMarkdown);
+      setBaselineMarkdown(proposedMarkdown);
       addHistory({ type: 'apply', detail: 'changes', timestamp: new Date().toISOString() });
       setProposedMarkdown(null);
       setEditorMode(EditorMode.VIEW);
@@ -319,6 +328,8 @@ const App: React.FC = () => {
             proposedMarkdown={proposedMarkdown}
             comparisonMarkdown={comparisonMarkdown}
             isDiffMode={editorMode === EditorMode.DIFF}
+            baselineMarkdown={baselineMarkdown}
+            initialBaselineMarkdown={initialBaselineMarkdown}
             highlights={highlights}
             onAcceptChange={handleAcceptChange}
             onRejectChange={handleRejectChange}

@@ -2,7 +2,7 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { EditorMode, DiffChange } from '../types';
 import { computeLineDiff } from '../utils/diffHelper';
-import { convertMarkdownToHtml, convertHtmlToMarkdown, generateDocBlob, generateRedlineHtml } from '../utils/formatHelpers';
+import { convertMarkdownToHtml, convertHtmlToMarkdown, generateDocBlob, generateRedlineHtml, getContractTitle, toFilenameBase, stripRedlineHtml } from '../utils/formatHelpers';
 import { parseFile } from '../utils/fileHelpers';
 import { useLanguage } from '../contexts/LanguageContext';
 import { 
@@ -15,6 +15,8 @@ interface EditorPanelProps {
   proposedMarkdown: string | null;
   comparisonMarkdown?: string | null; 
   isDiffMode: boolean; 
+  baselineMarkdown?: string | null;
+  initialBaselineMarkdown?: string | null;
   highlights?: string[];
   onAcceptChange: () => void;
   onRejectChange: () => void;
@@ -29,6 +31,8 @@ const EditorPanel: React.FC<EditorPanelProps> = ({
   proposedMarkdown,
   comparisonMarkdown,
   isDiffMode,
+  baselineMarkdown,
+  initialBaselineMarkdown,
   highlights = [],
   onAcceptChange,
   onRejectChange,
@@ -43,6 +47,7 @@ const EditorPanel: React.FC<EditorPanelProps> = ({
   const [floatBtnPos, setFloatBtnPos] = useState({ x: 0, y: 0 });
   const [selectedText, setSelectedText] = useState('');
   const [showExportMenu, setShowExportMenu] = useState(false);
+  const [isRichTextDirty, setIsRichTextDirty] = useState(false);
 
   const richTextRef = useRef<HTMLDivElement>(null);
   const draftTextRef = useRef<HTMLTextAreaElement>(null);
@@ -56,10 +61,11 @@ const EditorPanel: React.FC<EditorPanelProps> = ({
       // Switching TO Format: rendering handles conversion
     } else {
       // Switching TO Draft: capture HTML -> MD
-      if (richTextRef.current) {
-        const html = richTextRef.current.innerHTML;
+      if (richTextRef.current && isRichTextDirty) {
+        const html = stripRedlineHtml(richTextRef.current.innerHTML);
         const md = convertHtmlToMarkdown(html);
         onMarkdownChange(md);
+        setIsRichTextDirty(false);
       }
     }
     setActiveTab(newTab);
@@ -124,15 +130,42 @@ const EditorPanel: React.FC<EditorPanelProps> = ({
 
   const handleRichTextBlur = () => {
     if (richTextRef.current) {
-      const html = richTextRef.current.innerHTML;
+      const html = stripRedlineHtml(richTextRef.current.innerHTML);
       const md = convertHtmlToMarkdown(html);
       onMarkdownChange(md);
+      setIsRichTextDirty(false);
     }
   };
 
   const execCmd = (cmd: string, val?: string) => {
     document.execCommand(cmd, false, val);
+    setIsRichTextDirty(true);
   };
+
+  const formatHtml = useMemo(() => {
+    if (isDiffMode) {
+      if (proposedMarkdown) {
+        return generateRedlineHtml(contractMarkdown || '', proposedMarkdown || '');
+      }
+      if (comparisonMarkdown) {
+        return generateRedlineHtml(comparisonMarkdown || '', contractMarkdown || '');
+      }
+      return generateRedlineHtml(baselineMarkdown || contractMarkdown || '', contractMarkdown || '');
+    }
+    if (initialBaselineMarkdown && initialBaselineMarkdown !== contractMarkdown) {
+      return generateRedlineHtml(initialBaselineMarkdown || '', contractMarkdown || '');
+    }
+    if (baselineMarkdown && baselineMarkdown !== contractMarkdown) {
+      return generateRedlineHtml(baselineMarkdown || '', contractMarkdown || '');
+    }
+    return convertMarkdownToHtml(contractMarkdown);
+  }, [isDiffMode, comparisonMarkdown, contractMarkdown, baselineMarkdown, initialBaselineMarkdown, proposedMarkdown]);
+
+  useEffect(() => {
+    if (activeTab === 'format' && richTextRef.current) {
+      richTextRef.current.innerHTML = formatHtml;
+    }
+  }, [formatHtml, activeTab]);
 
   const handleImportClick = () => {
     fileInputRef.current?.click();
@@ -171,14 +204,16 @@ const EditorPanel: React.FC<EditorPanelProps> = ({
   const handleExportClean = () => {
     const html = convertMarkdownToHtml(contractMarkdown);
     const blob = generateDocBlob(html);
-    triggerDownload(blob, 'Contract_Final.doc');
+    const name = toFilenameBase(getContractTitle(contractMarkdown));
+    triggerDownload(blob, `${name}_Final.doc`);
   };
 
   const handleExportRedline = () => {
-    const targetDiffBase = comparisonMarkdown || contractMarkdown; // Fallback implies no diff
-    const redlineHtml = generateRedlineHtml(targetDiffBase, contractMarkdown);
+    const targetDiffBase = initialBaselineMarkdown || comparisonMarkdown || contractMarkdown;
+    const redlineHtml = generateRedlineHtml(targetDiffBase || '', contractMarkdown || '');
     const blob = generateDocBlob(redlineHtml);
-    triggerDownload(blob, 'Contract_Redlined.doc');
+    const name = toFilenameBase(getContractTitle(contractMarkdown));
+    triggerDownload(blob, `${name}_Redlined.doc`);
   };
 
   const renderHighlightedText = () => {
@@ -189,8 +224,17 @@ const EditorPanel: React.FC<EditorPanelProps> = ({
 
     highlights.forEach(highlight => {
       if (!highlight.trim()) return;
-      const cleanHighlight = highlight.replace(/\s+/g, '[\\s\\n]+');
-      const regex = new RegExp(`(${cleanHighlight})`, 'g');
+      const raw = highlight.trim().slice(0, 500);
+      const escapeRegExp = (s: string) => s.replace(/[.*+?^${}()|[\\]\\]/g, '\\$&');
+      const strippedMd = raw.replace(/\*\*/g, '').replace(/`/g, '').replace(/_/g, '');
+      const escaped = escapeRegExp(strippedMd);
+      const cleanHighlight = escaped.replace(/\s+/g, '[\\s\\n]+');
+      let regex: RegExp;
+      try {
+        regex = new RegExp(`(${cleanHighlight})`, 'g');
+      } catch {
+        return;
+      }
 
       for (let i = 0; i < segments.length; i++) {
         if (!segments[i].isHighlight) {
@@ -240,10 +284,9 @@ const EditorPanel: React.FC<EditorPanelProps> = ({
           </button>
           <button
             onClick={() => handleTabSwitch('format')}
-            disabled={isDiffMode}
             className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
               activeTab === 'format' ? 'bg-zinc-800 text-zinc-100 shadow-sm' : 'text-zinc-500 hover:text-zinc-300'
-            } ${isDiffMode ? 'opacity-50 cursor-not-allowed' : ''}`}
+            }`}
           >
             <IconEye className="w-3.5 h-3.5" />
             {t.editor.tabFormat}
@@ -413,8 +456,9 @@ const EditorPanel: React.FC<EditorPanelProps> = ({
                 ref={richTextRef}
                 contentEditable
                 onBlur={handleRichTextBlur}
+                onInput={() => setIsRichTextDirty(true)}
                 className="editor-content flex-1 px-12 py-16 text-zinc-900 font-serif outline-none"
-                dangerouslySetInnerHTML={{ __html: convertMarkdownToHtml(contractMarkdown) }}
+                dangerouslySetInnerHTML={{ __html: formatHtml }}
                 suppressContentEditableWarning
               />
             </div>

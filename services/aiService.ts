@@ -10,7 +10,8 @@ export const processUserRequest = async (
   conversationHistory: string[],
   language: 'en' | 'zh',
   settings: ModelSettings,
-  comparisonContext?: { original: string; revised: string }
+  comparisonContext?: { original: string; revised: string },
+  selectedContext?: string
 ): Promise<AIResponse> => {
   
   let contextBlock = `
@@ -35,6 +36,15 @@ export const processUserRequest = async (
     """
     
     The user is asking about the differences or wants to modify the Revised Contract based on the comparison.
+    `;
+  }
+
+  if (selectedContext) {
+    contextBlock += `
+    Selected Context:
+    """
+    ${selectedContext}
+    """
     `;
   }
 
