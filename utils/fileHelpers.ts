@@ -1,4 +1,4 @@
-import { convertHtmlToMarkdown } from './formatHelpers';
+import { convertHtmlToMarkdown, normalizeMarkdown } from './formatHelpers';
 
 // Declare global libraries loaded via CDN
 declare var mammoth: any;
@@ -13,7 +13,7 @@ export const parseDocx = async (arrayBuffer: ArrayBuffer): Promise<string> => {
     // Mammoth converts docx to HTML
     const result = await mammoth.convertToHtml({ arrayBuffer: arrayBuffer });
     // We convert HTML to Markdown so it fits our Draft/AI workflow
-    return convertHtmlToMarkdown(result.value);
+    return normalizeMarkdown(convertHtmlToMarkdown(result.value));
   } catch (error) {
     console.error("Error parsing DOCX:", error);
     throw new Error("Failed to parse DOCX file. It might be corrupted or encrypted.");
@@ -36,7 +36,7 @@ export const parsePdf = async (arrayBuffer: ArrayBuffer): Promise<string> => {
       fullText += pageText + '\n\n';
     }
     
-    return fullText;
+    return normalizeMarkdown(fullText);
   } catch (error) {
     console.error("Error parsing PDF:", error);
     throw new Error("Failed to parse PDF file.");
@@ -78,7 +78,7 @@ export const parseFile = async (file: File): Promise<string> => {
         if (fileName.endsWith('.html') || fileName.endsWith('.htm')) {
           content = convertHtmlToMarkdown(content);
         }
-        resolve(content);
+        resolve(normalizeMarkdown(content));
       };
       reader.onerror = () => reject(new Error("File reading failed"));
       reader.readAsText(file);

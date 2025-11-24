@@ -44,6 +44,18 @@ export const convertHtmlToMarkdown = (html: string): string => {
   }
 };
 
+export const normalizeMarkdown = (md: string): string => {
+  if (!md) return '';
+  let s = md.replace(/\r\n/g, "\n");
+  s = s.replace(/[\t ]+$/gm, "");
+  s = s.replace(/\n{3,}/g, "\n\n");
+  s = s.replace(/^\s*[•·]\s+/gm, "- ");
+  s = s.replace(/^\s*\*\s+/gm, "- ");
+  s = s.replace(/^\s*(\d+)[\).]\s+/gm, (m, n) => `${n}. `);
+  s = s.replace(/^#+(\S)/gm, (m, c) => m.replace(`#${c}`, `# ${c}`));
+  return s.trim();
+};
+
 /**
  * Wraps HTML content in a structure that Microsoft Word recognizes as a valid .doc file.
  * This allows saving the Rich Text content with formatting.

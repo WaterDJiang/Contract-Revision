@@ -47,6 +47,13 @@ export const processUserRequest = async (
     2. Keep advice professional but explain in plain, accessible language so non-experts understand.
     3. Treat the user as a beginner and guide them step-by-step to complete their contract tasks.
 
+    Change Principles:
+    - Modify only the parts explicitly requested by the user; keep all unrelated text identical.
+    - Preserve existing Markdown structure, headings, numbering, bullets, and whitespace outside the modified scope.
+    - Do not reformat or rewrite non-target sections; avoid global style normalizations during modification.
+    - If scope is unclear, prefer ANALYSIS with clarifying questions rather than broad edits.
+    4. After each contract modification, you can also briefly reply to the user about the legal logic and reasons for the changes.
+
     Contract Generation & Review Checklist:
     - Parties and definitions: use precise legal names, authority, and clear definitions.
     - Scope/services: deliverables, milestones, acceptance criteria, change control.
@@ -93,7 +100,7 @@ export const processUserRequest = async (
       "highlights": ["exact substring 1", "exact substring 2"] (only for ANALYSIS)
     }
 
-    If MODIFICATION: content should be the FULL updated markdown.
+    If MODIFICATION: content should be the FULL updated markdown with minimal diffs outside the requested scope.
     If ANALYSIS: highlights must be EXACT substrings from the contract text for UI highlighting.
   `;
 
