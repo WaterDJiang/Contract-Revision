@@ -155,9 +155,19 @@ export const processUserRequest = async (
     let apiKey = '';
     let baseUrl = settings.baseUrl;
 
+    const getEnvKey = (...names: string[]) => {
+      const im = typeof import.meta !== 'undefined' ? (import.meta as any).env || {} : {};
+      const w = typeof window !== 'undefined' ? (window as any) : {};
+      for (const n of names) {
+        const v = im?.[n] || w?.[n] || w?.__ENV__?.[n] || (w?.process?.env?.[n]) || (typeof process !== 'undefined' ? (process as any).env?.[n] : undefined);
+        if (v) return v as string;
+      }
+      return '';
+    };
+
     // GLM Specific Configuration (Zhipu AI)
     if (settings.provider === 'glm') {
-       apiKey = (typeof import.meta !== 'undefined' ? (import.meta as any).env?.VITE_GLM_API_KEY : undefined) || process.env.GLM_API_KEY || '';
+       apiKey = settings.keys?.glm || getEnvKey('VITE_GLM_API_KEY', 'GLM_API_KEY');
        baseUrl = 'https://open.bigmodel.cn/api/paas/v4';
     } else if (settings.provider === 'openai') {
        apiKey = settings.keys?.openai || (typeof import.meta !== 'undefined' ? (import.meta as any).env?.VITE_OPENAI_API_KEY : undefined) || process.env.OPENAI_API_KEY || '';
