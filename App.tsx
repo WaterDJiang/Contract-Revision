@@ -148,7 +148,20 @@ const App: React.FC = () => {
         const cleanCurrent = contractMarkdown.replace(/\s+/g, ' ').trim();
         const cleanNew = newMarkdown.replace(/\s+/g, ' ').trim();
 
-        if (cleanNew !== cleanCurrent) {
+        if (!cleanCurrent) {
+          setContractMarkdown(newMarkdown);
+          saveToStorage(newMarkdown);
+          setBaselineMarkdown(newMarkdown);
+          setInitialBaselineMarkdown(newMarkdown);
+          setProposedMarkdown(null);
+          setEditorMode(EditorMode.VIEW);
+          setMessages(prev => [...prev, {
+            id: (Date.now() + 1).toString(),
+            text: t.app.changesApplied,
+            sender: Sender.AI,
+            timestamp: new Date()
+          }]);
+        } else if (cleanNew !== cleanCurrent) {
           setProposedMarkdown(newMarkdown);
           setEditorMode(EditorMode.DIFF);
           setMessages(prev => [...prev, {
