@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { Message, Sender } from '../types';
 import { IconSend, IconSparkles, IconTerminal, IconX, IconGlobe } from './Icons';
 import { useLanguage } from '../contexts/LanguageContext';
@@ -9,6 +9,7 @@ interface ChatPanelProps {
   isProcessing: boolean;
   attachedContext: string | null;
   onClearContext: () => void;
+  contractMarkdown: string;
 }
 
 const ChatPanel: React.FC<ChatPanelProps> = ({ 
@@ -16,7 +17,8 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
   onSendMessage, 
   isProcessing, 
   attachedContext,
-  onClearContext
+  onClearContext,
+  contractMarkdown
 }) => {
   const [inputValue, setInputValue] = useState('');
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -51,6 +53,52 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
   const toggleLanguage = () => {
     setLanguage(language === 'en' ? 'zh' : 'en');
   };
+
+  const suggestions = useMemo(() => {
+    if (!messages.some(m => m.sender === Sender.USER)) return [];
+    const last = messages[messages.length - 1];
+    const isAIRecent = last?.sender === Sender.AI;
+    const text = (contractMarkdown || '').trim();
+    const hasContract = text.length > 100;
+    const zh = language === 'zh';
+    const hasConf = /(保密|机密|confidential)/i.test(text);
+    const hasIP = /(知识产权|版权|专利|intellectual property)/i.test(text);
+    const hasPayOrBreach = /(付款|支付|费用|结算|发票|违约|payment|invoice|breach)/i.test(text);
+    const hasTermOrTermination = /(期限|终止|解除|term|termination)/i.test(text);
+    const hasLaw = /(适用法律|管辖法律|法律适用|governing law)/i.test(text);
+    const hasDispute = /(争议|仲裁|法院|jurisdiction|dispute|arbitration)/i.test(text);
+
+    const labels = {
+      apply: zh ? '把上面的修改直接应用到合同' : 'Apply the changes above to the contract',
+      compliance: zh ? '帮我检查是条款否违反法律' : 'Check if anything violates the law',
+      commercial: zh ? '看看付款和违约是否合理' : 'Review payment and breach terms',
+      risk: zh ? '加上保密和知识产权条款' : 'Add confidentiality and IP clauses',
+      law: zh ? '补充适用法律和争议解决' : 'Add governing law and dispute resolution',
+      summary: zh ? '整理合同要点给我' : 'Make a one-page summary for stakeholders',
+      startNda: zh ? '起草一份保密协议' : 'Draft an NDA'
+    };
+
+    if (!hasContract) return [];
+
+    const candidates: Array<{ key: string; text: string; score: number }> = [];
+    if (isAIRecent) candidates.push({ key: 'apply', text: labels.apply, score: 100 });
+    candidates.push({ key: 'compliance', text: labels.compliance, score: 80 });
+    if (!hasPayOrBreach || !hasTermOrTermination) candidates.push({ key: 'commercial', text: labels.commercial, score: 75 });
+    if (!hasConf || !hasIP) candidates.push({ key: 'risk', text: labels.risk, score: 70 });
+    if (!hasLaw || !hasDispute) candidates.push({ key: 'law', text: labels.law, score: 65 });
+    candidates.push({ key: 'summary', text: labels.summary, score: 60 });
+
+    const picked: string[] = [];
+    const seenKeys = new Set<string>();
+    candidates.sort((a, b) => b.score - a.score);
+    for (const c of candidates) {
+      if (seenKeys.has(c.key)) continue;
+      seenKeys.add(c.key);
+      picked.push(c.text);
+      if (picked.length >= 4) break;
+    }
+    return picked;
+  }, [messages, language, contractMarkdown]);
 
   return (
     <div className="flex flex-col h-full bg-zinc-900 border-l border-zinc-800">
@@ -110,6 +158,20 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
       </div>
 
       <div className="p-4 border-t border-zinc-800 bg-zinc-900">
+        {suggestions.length > 0 && (
+          <div className="mb-3 flex flex-wrap gap-2">
+            {suggestions.map((s, i) => (
+              <button
+                key={i}
+                onClick={() => !isProcessing && onSendMessage(s)}
+                className="px-2.5 py-1 text-[11px] rounded-full border border-zinc-700 text-zinc-300 hover:border-brand-500 hover:text-brand-200 hover:bg-brand-600/10 transition-colors"
+                disabled={isProcessing}
+              >
+                {s}
+              </button>
+            ))}
+          </div>
+        )}
         {attachedContext && (
           <div className="mb-3 bg-zinc-800/50 border border-brand-500/30 rounded-lg p-2 flex items-start gap-3 relative group">
              <div className="p-1.5 bg-brand-500/10 rounded text-brand-500 mt-0.5">

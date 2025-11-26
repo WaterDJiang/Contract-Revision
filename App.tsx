@@ -145,10 +145,31 @@ const App: React.FC = () => {
 
       if (response.intent === 'MODIFICATION') {
         const newMarkdown = response.content;
+        const isContractBody = (s: string): boolean => {
+          if (!s || typeof s !== 'string') return false;
+          const t = s.trim();
+          if (t.length < 300) return false;
+          const title = (t.match(/^#\s*(.+)$/m)?.[1] || '').toLowerCase();
+          const hasContractKeyword = /(合同|协议)/.test(title) || /(agreement|contract)/i.test(title);
+          const negative = /(摘要|要点|概要|概述|清单|Checklist|Summary|Outline|指南|说明|Q&A|常见问题)/i;
+          if (negative.test(title) || negative.test(t.slice(0, 400))) return false;
+          const hasParties = /(甲方|乙方|双方)/.test(t) || /(Parties|Party)/i.test(t);
+          const clauseCount = ((t.match(/^#{2,3}\s.+$/gm) || []).length) 
+                            + ((t.match(/第\s*\d+\s*条/g) || []).length) 
+                            + ((t.match(/\n\d+\.\s/g) || []).length);
+          return hasContractKeyword && hasParties && clauseCount >= 3;
+        };
         const cleanCurrent = contractMarkdown.replace(/\s+/g, ' ').trim();
         const cleanNew = newMarkdown.replace(/\s+/g, ' ').trim();
 
-        if (!cleanCurrent) {
+        if (!isContractBody(newMarkdown)) {
+          setMessages(prev => [...prev, {
+            id: (Date.now() + 1).toString(),
+            text: response.content,
+            sender: Sender.AI,
+            timestamp: new Date()
+          }]);
+        } else if (!cleanCurrent) {
           setContractMarkdown(newMarkdown);
           saveToStorage(newMarkdown);
           setBaselineMarkdown(newMarkdown);
@@ -357,6 +378,7 @@ const App: React.FC = () => {
             isProcessing={isProcessing}
             attachedContext={selectedContext}
             onClearContext={handleClearContext}
+            contractMarkdown={contractMarkdown}
           />
         </div>
       </div>
@@ -365,3 +387,12 @@ const App: React.FC = () => {
 };
 
 export default App;
+  const looksLikeContract = (s: string): boolean => {
+    if (!s || typeof s !== 'string') return false;
+    const text = s.trim();
+    if (text.length < 200) return false;
+    const hasHeadings = /^(#{1,3}\s)|(^\d+\.\s)|(^[-*]\s)/m.test(text);
+    const zhHints = /(合同|协议|甲方|乙方|服务|期限|终止|付款|保密|知识产权|适用法律)/.test(text);
+    const enHints = /(Agreement|Parties|Services|Term|Termination|Payment|Confidentiality|Intellectual Property|Governing Law)/i.test(text);
+    return hasHeadings || zhHints || enHints;
+  };

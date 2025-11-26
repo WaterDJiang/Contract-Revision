@@ -13,6 +13,8 @@ export const processUserRequest = async (
   comparisonContext?: { original: string; revised: string },
   selectedContext?: string
 ): Promise<AIResponse> => {
+  const draftIntentRegex = /(起草|草拟|生成|写一份|写一个|给我.*合同|制作.*合同|创建.*合同|draft|generate|create\s+(an|a)?\s*(contract|agreement)|write\s+(an|a)?\s*(contract|agreement))/i;
+  const intentHint = draftIntentRegex.test(userInstruction) ? 'DRAFT_REQUEST' : 'NONE';
   
   let contextBlock = `
     Current Contract (Markdown):
@@ -96,10 +98,11 @@ export const processUserRequest = async (
     User Instruction: "${userInstruction}"
     
     Conversation Context:
-    ${conversationHistory.slice(-5).join('\n')}
+    ${conversationHistory.slice(-10).join('\n')}
     
     Your Task:
     Determine if the user wants to MODIFY the contract (rewrite/edit) or ANALYZE it (ask questions/risks/summarize).
+    MODE_HINT: ${intentHint}
     
     Output strictly valid JSON.
     
@@ -112,6 +115,11 @@ export const processUserRequest = async (
 
     If MODIFICATION: content should be the FULL updated markdown with minimal diffs outside the requested scope.
     If ANALYSIS: highlights must be EXACT substrings from the contract text for UI highlighting.
+
+    Intent Override Policy:
+    - If MODE_HINT == 'DRAFT_REQUEST', you MUST set intent = 'MODIFICATION' and return a COMPLETE Markdown contract.
+    - Do NOT ask questions; assume reasonable defaults and use placeholders when details are missing.
+    - Keep clean Markdown structure with headings, lists, and numbered sections.
   `;
 
   // --- GOOGLE GENAI IMPLEMENTATION ---
