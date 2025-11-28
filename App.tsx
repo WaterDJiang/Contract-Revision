@@ -16,7 +16,7 @@ import { useSettings } from './contexts/SettingsContext';
 
 const LOCAL_STORAGE_KEY = 'lexigen_contract_draft_md';
 
-const draftIntentRegex = /(起草|草拟|生成|写一份|写一个|给我.*合同|制作.*合同|创建.*合同|draft|generate|create\s+(an|a)?\s*(contract|agreement)|write\s+(an|a)?\s*(contract|agreement))/i;
+const draftIntentRegex = /(起草|草拟|擬|草擬|生成|制作|创建|寫|寫一份|写一份|写一个|給我|给我).*(合同|協議|协议|模板|範本|范本|證書|证书|證明|证明|授權書|授权书|聲明|声明|函)|\b(template|draft|generate|create|write)\b.*\b(contract|agreement|certificate|incumbency|resolution|power\s+of\s+attorney)\b|Certificate\s+of\s+Incumbency/i;
 
 const computeContractScore = (s: string): number => {
   if (!s || typeof s !== 'string') return 0;
@@ -24,10 +24,19 @@ const computeContractScore = (s: string): number => {
   if (t.length < 200) return 0;
   const title = (t.match(/^#\s*(.+)$/m)?.[1] || '').toLowerCase();
   const early = t.slice(0, 600);
-  const negative = /(摘要|要点|概要|概述|清单|清晰列表|Checklist|Summary|Outline|指南|说明|Q&A|常见问题|提纲|笔记|邮件|备忘录)/i;
+  const negative = /(摘要|要点|概要|概述|清单|清晰列表|Checklist|Summary|Outline|指南|说明|Q&A|常见问题|提纲|笔记|邮件|备忘录|總結|提要|重點|範例說明)/i;
   if (negative.test(title) || negative.test(early)) return 0;
-  const hasContractKeyword = /(合同|协议)/.test(title) || /(agreement|contract)/i.test(title) || /(合同|协议)/.test(early);
-  const hasParties = /(甲方|乙方|双方)/.test(t) || /(Parties|Party)/i.test(t);
+  const docTypeHints = [
+    /(合同|協議|协议)/,
+    /(證書|证书|證明|证明|Certificate|Incumbency)/i,
+    /(授權書|授权书|Power\s*of\s*Attorney)/i,
+    /(決議|决议|董事會|董事会|Resolution)/i,
+    /(聲明|声明|函|通知|Notice|Statement)/i,
+    /(章程|公司章程|Articles\s*of\s*Association)/i
+  ];
+  let typeHits = 0;
+  for (const r of docTypeHints) if (r.test(title) || r.test(early) || r.test(t)) typeHits++;
+  const hasParties = /(甲方|乙方|双方|公司|法人)/.test(t) || /(Parties|Party|Company|Corporation)/i.test(t);
   const clauseHeadings = (t.match(/^#{2,3}\s.+$/gm) || []).length;
   const numberedClauses = (t.match(/\n\d+\.\s/g) || []).length + (t.match(/第\s*\d+\s*条/g) || []).length;
   const typicalTerms = [
@@ -41,7 +50,7 @@ const computeContractScore = (s: string): number => {
   let termHits = 0;
   for (const r of typicalTerms) if (r.test(t)) termHits++;
   const lenScore = Math.min(1, t.length / 1200);
-  const kwScore = hasContractKeyword ? 1 : 0;
+  const kwScore = Math.min(1, typeHits / 2);
   const partiesScore = hasParties ? 1 : 0;
   const structureScore = Math.min(1, (clauseHeadings + numberedClauses) / 6);
   const termsScore = Math.min(1, termHits / 4);
@@ -49,7 +58,13 @@ const computeContractScore = (s: string): number => {
   return score;
 };
 
-const isLikelyContract = (s: string): boolean => computeContractScore(s) >= 0.6;
+const isLikelyContract = (s: string): boolean => computeContractScore(s) >= 0.5;
+const isLikelySummary = (s: string): boolean => {
+  const t = (s || '').trim();
+  if (t.length < 80) return true;
+  const early = t.slice(0, 400);
+  return /(摘要|要点|概要|概述|清单|Checklist|Summary|Outline|指南|说明|Q&A|常见问题|總結|提要|重點)/i.test(early);
+};
 
 type ViewMode = 'landing' | 'editor';
 
@@ -184,24 +199,33 @@ const App: React.FC = () => {
         const cleanCurrent = contractMarkdown.replace(/\s+/g, ' ').trim();
         const cleanNew = newMarkdown.replace(/\s+/g, ' ').trim();
 
-        if (!isLikelyContract(newMarkdown)) {
+        if (isDraftRequest) {
+          if (isLikelySummary(newMarkdown) || newMarkdown.trim().length < 120) {
+            setMessages(prev => [...prev, {
+              id: (Date.now() + 1).toString(),
+              text: response.content,
+              sender: Sender.AI,
+              timestamp: new Date()
+            }]);
+          } else {
+            const prev = contractMarkdown;
+            setContractMarkdown(newMarkdown);
+            saveToStorage(newMarkdown);
+            setInitialBaselineMarkdown(prev || newMarkdown);
+            setBaselineMarkdown(newMarkdown);
+            setProposedMarkdown(null);
+            setEditorMode(EditorMode.VIEW);
+            setMessages(prevMsgs => [...prevMsgs, {
+              id: (Date.now() + 1).toString(),
+              text: t.app.changesApplied,
+              sender: Sender.AI,
+              timestamp: new Date()
+            }]);
+          }
+        } else if (!isLikelyContract(newMarkdown)) {
           setMessages(prev => [...prev, {
             id: (Date.now() + 1).toString(),
             text: response.content,
-            sender: Sender.AI,
-            timestamp: new Date()
-          }]);
-        } else if (isDraftRequest) {
-          const prev = contractMarkdown;
-          setContractMarkdown(newMarkdown);
-          saveToStorage(newMarkdown);
-          setInitialBaselineMarkdown(prev || newMarkdown);
-          setBaselineMarkdown(newMarkdown);
-          setProposedMarkdown(null);
-          setEditorMode(EditorMode.VIEW);
-          setMessages(prevMsgs => [...prevMsgs, {
-            id: (Date.now() + 1).toString(),
-            text: t.app.changesApplied,
             sender: Sender.AI,
             timestamp: new Date()
           }]);

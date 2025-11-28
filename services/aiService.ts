@@ -13,7 +13,7 @@ export const processUserRequest = async (
   comparisonContext?: { original: string; revised: string },
   selectedContext?: string
 ): Promise<AIResponse> => {
-  const draftIntentRegex = /(起草|草拟|生成|写一份|写一个|给我.*合同|制作.*合同|创建.*合同|draft|generate|create\s+(an|a)?\s*(contract|agreement)|write\s+(an|a)?\s*(contract|agreement))/i;
+  const draftIntentRegex = /(起草|草拟|擬|草擬|生成|制作|创建|寫|寫一份|写一份|写一个|給我|给我).*(合同|協議|协议|模板|範本|范本|證書|证书|證明|证明|授權書|授权书|聲明|声明|函)|\b(template|draft|generate|create|write)\b.*\b(contract|agreement|certificate|incumbency|resolution|power\s+of\s+attorney)\b|Certificate\s+of\s+Incumbency/i;
   const intentHint = draftIntentRegex.test(userInstruction) ? 'DRAFT_REQUEST' : 'NONE';
   
   let contextBlock = `
