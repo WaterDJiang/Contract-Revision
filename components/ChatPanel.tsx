@@ -5,11 +5,12 @@ import { useLanguage } from '../contexts/LanguageContext';
 
 interface ChatPanelProps {
   messages: Message[];
-  onSendMessage: (text: string) => void;
+  onSendMessage: (text: string, contextText?: string) => void;
   isProcessing: boolean;
   attachedContext: string | null;
   onClearContext: () => void;
   contractMarkdown: string;
+  scenario?: 'new' | 'import' | 'compare' | null;
 }
 
 const ChatPanel: React.FC<ChatPanelProps> = ({ 
@@ -18,7 +19,8 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
   isProcessing, 
   attachedContext,
   onClearContext,
-  contractMarkdown
+  contractMarkdown,
+  scenario
 }) => {
   const [inputValue, setInputValue] = useState('');
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -38,7 +40,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
 
   const handleSend = () => {
     if (inputValue.trim() && !isProcessing) {
-      onSendMessage(inputValue);
+      onSendMessage(inputValue, attachedContext || undefined);
       setInputValue('');
     }
   };
@@ -55,7 +57,6 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
   };
 
   const suggestions = useMemo(() => {
-    if (!messages.some(m => m.sender === Sender.USER)) return [];
     const last = messages[messages.length - 1];
     const isAIRecent = last?.sender === Sender.AI;
     const text = (contractMarkdown || '').trim();
@@ -78,7 +79,19 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
       startNda: zh ? '起草一份保密协议' : 'Draft an NDA'
     };
 
-    if (!hasContract) return [];
+    const scenarioLabels: Record<'new'|'import'|'compare', string[]> = {
+      new: zh
+        ? ['生成一份保密协议（NDA）模板', '生成一份服务合同模板', '生成一份采购合同模板']
+        : ['Generate an NDA template', 'Generate a Services Agreement template', 'Generate a Purchase Agreement template'],
+      import: zh
+        ? ['自动审查风险并给出修改建议', '检查付款与违约是否合理', '生成一页要点总结', '转换为标准格式并美化排版']
+        : ['Run risk review and suggestions', 'Check payment and breach reasonableness', 'Create a one-page summary', 'Convert to standard format and improve layout'],
+      compare: zh
+        ? ['分析原文与修订的差异影响', '汇总重大变更及风险提示', '将修订合并到正文并生成红线版', '导出修订版或最终版']
+        : ['Analyze differences and impact', 'Summarize major changes and risks', 'Merge revisions into the contract and create redlines', 'Export redlined or clean version']
+    };
+
+    if (scenario) return scenarioLabels[scenario];
 
     const candidates: Array<{ key: string; text: string; score: number }> = [];
     if (isAIRecent) candidates.push({ key: 'apply', text: labels.apply, score: 100 });
@@ -98,7 +111,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
       if (picked.length >= 4) break;
     }
     return picked;
-  }, [messages, language, contractMarkdown]);
+  }, [messages, language, contractMarkdown, scenario]);
 
   return (
     <div className="flex flex-col h-full bg-zinc-900 border-l border-zinc-800">
@@ -138,6 +151,16 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
             >
               {msg.text}
             </div>
+            {msg.contextText && (
+              <details className="max-w-[90%] mt-2 text-xs bg-zinc-900/50 border border-zinc-800 rounded-lg p-2">
+                <summary className="cursor-pointer text-zinc-400">
+                  {(msg.contextText || '').slice(0, 10)}{(msg.contextText || '').length > 10 ? '…' : ''}
+                </summary>
+                <div className="mt-2 text-zinc-300 font-mono break-words whitespace-pre-wrap">
+                  {msg.contextText}
+                </div>
+              </details>
+            )}
             <span className="text-[10px] text-zinc-600 mt-1 px-1">
               {msg.sender === Sender.AI ? t.chat.ai : t.chat.user}
             </span>

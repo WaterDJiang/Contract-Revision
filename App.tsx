@@ -8,7 +8,7 @@ import SettingsModal from './components/SettingsModal';
 import SuggestModal from './components/SuggestModal';
 import CompareModal from './components/CompareModal';
 import HistoryModal from './components/HistoryModal';
-import { IconFile, IconHistory, IconSettings, IconGitMerge, IconSend } from './components/Icons';
+import { IconFile, IconHistory, IconSettings, IconCompare, IconSend } from './components/Icons';
 import { processUserRequest } from './services/aiService';
 import { addHistory } from './utils/historyStore';
 import { useLanguage } from './contexts/LanguageContext';
@@ -66,6 +66,15 @@ const isLikelySummary = (s: string): boolean => {
   return /(摘要|要点|概要|概述|清单|Checklist|Summary|Outline|指南|说明|Q&A|常见问题|總結|提要|重點)/i.test(early);
 };
 
+const sanitizeDraft = (s: string): string => {
+  let t = (s || '').trim();
+  t = t.replace(/```[a-z]*\n([\s\S]*?)\n```/gi, '$1').replace(/```/g, '');
+  const headingIdx = t.search(/^(#{1,3}\s)|(^\d+\.\s)|(^第\s*\d+\s*条)/m);
+  if (headingIdx > 0) t = t.slice(headingIdx).trim();
+  t = t.replace(/^((好的|根据|依据|以下是|这是|我已|我已经|修改后|Here\s+is|Below\s+is|I\s+have|Updated).*)(\r?\n)+/i, '').trim();
+  return t;
+};
+
 type ViewMode = 'landing' | 'editor';
 
 const App: React.FC = () => {
@@ -87,6 +96,7 @@ const App: React.FC = () => {
   const [isCompareModalOpen, setIsCompareModalOpen] = useState(false);
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [isSuggestModalOpen, setIsSuggestModalOpen] = useState(false);
+  const [entryScenario, setEntryScenario] = useState<'new' | 'import' | 'compare' | null>(null);
 
   const saveToStorage = (content: string) => {
     try {
@@ -122,6 +132,7 @@ const App: React.FC = () => {
       timestamp: new Date(),
     }]);
     addHistory({ type: 'new', detail: 'workspace', timestamp: new Date().toISOString() });
+    setEntryScenario('new');
     setViewMode('editor');
   };
 
@@ -138,6 +149,7 @@ const App: React.FC = () => {
       timestamp: new Date(),
     }]);
     addHistory({ type: 'import', detail: 'file', timestamp: new Date().toISOString() });
+    setEntryScenario('import');
     setViewMode('editor');
   };
 
@@ -155,6 +167,7 @@ const App: React.FC = () => {
       sender: Sender.AI,
       timestamp: new Date()
     }]);
+    setEntryScenario('compare');
   };
 
   const handleAddToChat = useCallback((text: string) => {
@@ -165,12 +178,13 @@ const App: React.FC = () => {
     setSelectedContext(null);
   }, []);
 
-  const handleSendMessage = useCallback(async (text: string) => {
+  const handleSendMessage = useCallback(async (text: string, contextText?: string) => {
     const userMsg: Message = {
       id: Date.now().toString(),
       text,
       sender: Sender.USER,
-      timestamp: new Date()
+      timestamp: new Date(),
+      contextText
     };
     setMessages(prev => [...prev, userMsg]);
     setIsProcessing(true);
@@ -193,14 +207,15 @@ const App: React.FC = () => {
         selectedContext || undefined
       );
 
-      if (response.intent === 'MODIFICATION') {
+      if (response.intent === 'MODIFICATION' || draftIntentRegex.test(text)) {
         const newMarkdown = response.content;
+        const sanitizedMarkdown = sanitizeDraft(newMarkdown);
         const isDraftRequest = draftIntentRegex.test(text);
         const cleanCurrent = contractMarkdown.replace(/\s+/g, ' ').trim();
-        const cleanNew = newMarkdown.replace(/\s+/g, ' ').trim();
+        const cleanNew = sanitizedMarkdown.replace(/\s+/g, ' ').trim();
 
         if (isDraftRequest) {
-          if (isLikelySummary(newMarkdown) || newMarkdown.trim().length < 120) {
+          if (isLikelySummary(sanitizedMarkdown) || sanitizedMarkdown.trim().length < 120 || !isLikelyContract(sanitizedMarkdown)) {
             setMessages(prev => [...prev, {
               id: (Date.now() + 1).toString(),
               text: response.content,
@@ -209,10 +224,10 @@ const App: React.FC = () => {
             }]);
           } else {
             const prev = contractMarkdown;
-            setContractMarkdown(newMarkdown);
-            saveToStorage(newMarkdown);
-            setInitialBaselineMarkdown(prev || newMarkdown);
-            setBaselineMarkdown(newMarkdown);
+            setContractMarkdown(sanitizedMarkdown);
+            saveToStorage(sanitizedMarkdown);
+            setInitialBaselineMarkdown(prev || sanitizedMarkdown);
+            setBaselineMarkdown(sanitizedMarkdown);
             setProposedMarkdown(null);
             setEditorMode(EditorMode.VIEW);
             setMessages(prevMsgs => [...prevMsgs, {
@@ -222,7 +237,7 @@ const App: React.FC = () => {
               timestamp: new Date()
             }]);
           }
-        } else if (!isLikelyContract(newMarkdown)) {
+        } else if (!isLikelyContract(sanitizedMarkdown)) {
           setMessages(prev => [...prev, {
             id: (Date.now() + 1).toString(),
             text: response.content,
@@ -230,10 +245,10 @@ const App: React.FC = () => {
             timestamp: new Date()
           }]);
         } else if (!cleanCurrent) {
-          setContractMarkdown(newMarkdown);
-          saveToStorage(newMarkdown);
-          setBaselineMarkdown(newMarkdown);
-          setInitialBaselineMarkdown(newMarkdown);
+          setContractMarkdown(sanitizedMarkdown);
+          saveToStorage(sanitizedMarkdown);
+          setBaselineMarkdown(sanitizedMarkdown);
+          setInitialBaselineMarkdown(sanitizedMarkdown);
           setProposedMarkdown(null);
           setEditorMode(EditorMode.VIEW);
           setMessages(prev => [...prev, {
@@ -243,7 +258,7 @@ const App: React.FC = () => {
             timestamp: new Date()
           }]);
         } else if (cleanNew !== cleanCurrent) {
-          setProposedMarkdown(newMarkdown);
+          setProposedMarkdown(sanitizedMarkdown);
           setEditorMode(EditorMode.DIFF);
           setMessages(prev => [...prev, {
             id: (Date.now() + 1).toString(),
@@ -282,6 +297,7 @@ const App: React.FC = () => {
     } finally {
       setIsProcessing(false);
       setSelectedContext(null);
+      setEntryScenario(null);
     }
   }, [contractMarkdown, comparisonMarkdown, messages, selectedContext, language, t, settings]);
 
@@ -378,12 +394,12 @@ const App: React.FC = () => {
                <button 
                  onClick={() => setIsCompareModalOpen(true)}
                  className={`p-3 rounded-xl transition-colors ${comparisonMarkdown ? 'bg-brand-900/30 text-brand-400 border border-brand-500/30' : 'text-zinc-500 hover:bg-zinc-800 hover:text-zinc-300'}`}
-                 title={language === 'zh' ? '合同比对' : 'Compare Contracts'}
-               >
-                  <IconGitMerge className="w-5 h-5" />
-               </button>
-               <span className="pointer-events-none absolute left-12 top-1/2 -translate-y-1/2 px-2 py-1 rounded bg-zinc-800 border border-zinc-700 text-[11px] text-zinc-300 opacity-0 group-hover:opacity-100 whitespace-nowrap">{language === 'zh' ? '合同比对' : 'Compare Contracts'}</span>
-             </div>
+                 title={language === 'zh' ? '对比新旧合同' : 'Compare Contracts'}
+              >
+                  <IconCompare className="w-5 h-5" />
+              </button>
+              <span className="pointer-events-none absolute left-12 top-1/2 -translate-y-1/2 px-2 py-1 rounded bg-zinc-800 border border-zinc-700 text-[11px] text-zinc-300 opacity-0 group-hover:opacity-100 whitespace-nowrap">{language === 'zh' ? '对比新旧合同' : 'Compare Contracts'}</span>
+            </div>
              <div className="relative group">
                <button onClick={() => setIsHistoryOpen(true)} title={language === 'zh' ? '历史' : 'History'} className="p-3 rounded-xl text-zinc-500 hover:bg-zinc-800/50 hover:text-zinc-300 transition-colors"><IconHistory className="w-5 h-5" /></button>
                <span className="pointer-events-none absolute left-12 top-1/2 -translate-y-1/2 px-2 py-1 rounded bg-zinc-800 border border-zinc-700 text-[11px] text-zinc-300 opacity-0 group-hover:opacity-100 whitespace-nowrap">{language === 'zh' ? '历史' : 'History'}</span>
@@ -439,6 +455,7 @@ const App: React.FC = () => {
             attachedContext={selectedContext}
             onClearContext={handleClearContext}
             contractMarkdown={contractMarkdown}
+            scenario={entryScenario}
           />
         </div>
       </div>

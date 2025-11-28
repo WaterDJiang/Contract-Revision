@@ -9,6 +9,7 @@ export interface Message {
   sender: Sender;
   timestamp: Date;
   isThinking?: boolean;
+  contextText?: string;
 }
 
 export enum EditorMode {

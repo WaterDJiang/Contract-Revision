@@ -7,7 +7,7 @@ import { parseFile } from '../utils/fileHelpers';
 import { useLanguage } from '../contexts/LanguageContext';
 import { 
   IconCheck, IconX, IconBold, IconItalic, IconH1, IconH2, IconList, 
-  IconUpload, IconDownload, IconEdit, IconEye, IconPlusChat, IconChevronDown
+  IconUpload, IconDownload, IconEdit, IconEye, IconPlusChat, IconChevronDown, IconUndo, IconRedo
 } from './Icons';
 
 interface EditorPanelProps {
@@ -48,6 +48,9 @@ const EditorPanel: React.FC<EditorPanelProps> = ({
   const [selectedText, setSelectedText] = useState('');
   const [showExportMenu, setShowExportMenu] = useState(false);
   const [isRichTextDirty, setIsRichTextDirty] = useState(false);
+  const [history, setHistory] = useState<string[]>([contractMarkdown]);
+  const [historyIndex, setHistoryIndex] = useState<number>(0);
+  const [isApplyingHistory, setIsApplyingHistory] = useState(false);
 
   const richTextRef = useRef<HTMLDivElement>(null);
   const draftTextRef = useRef<HTMLTextAreaElement>(null);
@@ -88,6 +91,53 @@ const EditorPanel: React.FC<EditorPanelProps> = ({
     }
     return [];
   }, [contractMarkdown, proposedMarkdown, comparisonMarkdown, isDiffMode]);
+
+  useEffect(() => {
+    if (isApplyingHistory) {
+      setIsApplyingHistory(false);
+      return;
+    }
+    if (history[historyIndex] !== contractMarkdown) {
+      const next = history.slice(0, historyIndex + 1);
+      next.push(contractMarkdown);
+      setHistory(next);
+      setHistoryIndex(next.length - 1);
+    }
+  }, [contractMarkdown]);
+
+  const handleUndo = () => {
+    if (isDiffMode) return;
+    if (historyIndex > 0) {
+      const idx = historyIndex - 1;
+      setIsApplyingHistory(true);
+      setHistoryIndex(idx);
+      onMarkdownChange(history[idx]);
+    }
+  };
+
+  const handleRedo = () => {
+    if (isDiffMode) return;
+    if (historyIndex < history.length - 1) {
+      const idx = historyIndex + 1;
+      setIsApplyingHistory(true);
+      setHistoryIndex(idx);
+      onMarkdownChange(history[idx]);
+    }
+  };
+
+  const handleEditorKeyDown = (e: React.KeyboardEvent) => {
+    const meta = e.metaKey || e.ctrlKey;
+    if (meta && e.key.toLowerCase() === 'z') {
+      e.preventDefault();
+      if (e.shiftKey) handleRedo(); else handleUndo();
+    } else if (meta && e.key.toLowerCase() === 'y') {
+      e.preventDefault();
+      handleRedo();
+    }
+  };
+
+  const canUndo = !isDiffMode && historyIndex > 0;
+  const canRedo = !isDiffMode && historyIndex < history.length - 1;
 
   const handleDraftChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     onMarkdownChange(e.target.value);
@@ -295,22 +345,40 @@ const EditorPanel: React.FC<EditorPanelProps> = ({
 
         <div className="flex items-center gap-2 relative">
              <button 
+                onClick={handleUndo}
+                disabled={!canUndo}
+                className={`p-2 text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800 rounded transition-colors ${!canUndo ? 'opacity-50' : ''}`}
+                title={t.editor.btnUndo}
+             >
+               <IconUndo className="w-4 h-4" />
+             </button>
+             <button 
+                onClick={handleRedo}
+                disabled={!canRedo}
+                className={`p-2 text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800 rounded transition-colors ${!canRedo ? 'opacity-50' : ''}`}
+                title={t.editor.btnRedo}
+             >
+               <IconRedo className="w-4 h-4" />
+             </button>
+             <button 
                 onClick={handleImportClick} 
                 disabled={isImporting}
-                className={`p-2 text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800 rounded transition-colors ${isImporting ? 'opacity-50' : ''}`} 
+                className={`flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-zinc-300 hover:text-zinc-100 hover:bg-zinc-800 rounded transition-colors border border-zinc-700 ${isImporting ? 'opacity-50' : ''}`} 
                 title={t.editor.btnImport}
              >
                {isImporting ? <div className="w-4 h-4 border-2 border-zinc-500 border-t-zinc-200 rounded-full animate-spin" /> : <IconUpload className="w-4 h-4" />}
+               <span>{t.editor.btnImport}</span>
              </button>
              
              {/* Export Dropdown */}
              <div className="relative">
                <button 
                  onClick={() => setShowExportMenu(!showExportMenu)}
-                 className="flex items-center gap-1 p-2 text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800 rounded transition-colors"
-                 title={t.editor.btnExport}
+                 className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-zinc-300 hover:text-zinc-100 hover:bg-zinc-800 rounded transition-colors border border-zinc-700"
+                 title={t.editor.btnSave}
                >
                  <IconDownload className="w-4 h-4" />
+                 <span>{t.editor.btnSave}</span>
                  <IconChevronDown className="w-3 h-3" />
                </button>
                
@@ -411,6 +479,7 @@ const EditorPanel: React.FC<EditorPanelProps> = ({
                   onChange={handleDraftChange}
                   onScroll={handleScroll}
                   onMouseUp={handleMouseUp}
+                  onKeyDown={handleEditorKeyDown}
                   className="absolute inset-0 w-full h-full bg-transparent text-zinc-300 font-mono text-sm p-8 resize-none focus:outline-none leading-relaxed z-10 selection:bg-brand-500/30"
                   placeholder={t.editor.placeholder}
                 />
@@ -457,6 +526,7 @@ const EditorPanel: React.FC<EditorPanelProps> = ({
                 contentEditable
                 onBlur={handleRichTextBlur}
                 onInput={() => setIsRichTextDirty(true)}
+                onKeyDown={handleEditorKeyDown}
                 className="editor-content flex-1 px-12 py-16 text-zinc-900 font-serif outline-none"
                 dangerouslySetInnerHTML={{ __html: formatHtml }}
                 suppressContentEditableWarning

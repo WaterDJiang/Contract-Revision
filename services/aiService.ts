@@ -50,7 +50,7 @@ export const processUserRequest = async (
     `;
   }
 
-  const systemPrompt = `
+  const systemContent = `
     You are an expert legal aide and contract drafter.
     Output language: if language == 'zh', use Chinese (Simplified); otherwise, use English.
 
@@ -64,7 +64,7 @@ export const processUserRequest = async (
     - Preserve existing Markdown structure, headings, numbering, bullets, and whitespace outside the modified scope.
     - Do not reformat or rewrite non-target sections; avoid global style normalizations during modification.
     - If scope is unclear, prefer ANALYSIS with clarifying questions rather than broad edits.
-    4. After each contract modification, you can also briefly reply to the user about the legal logic and reasons for the changes.
+    4. After each contract modification, briefly explain the legal logic and reasons for the changes.
 
     Contract Generation & Review Checklist:
     - Parties and definitions: use precise legal names, authority, and clear definitions.
@@ -93,19 +93,12 @@ export const processUserRequest = async (
     - Ask targeted questions to fill gaps (e.g., governing law, IP ownership, SLA needs).
     - Provide step-by-step guidance to help the user complete their contract tasks.
 
-    ${contextBlock}
-
-    User Instruction: "${userInstruction}"
-    
-    Conversation Context:
-    ${conversationHistory.slice(-10).join('\n')}
-    
     Your Task:
     Determine if the user wants to MODIFY the contract (rewrite/edit) or ANALYZE it (ask questions/risks/summarize).
     MODE_HINT: ${intentHint}
-    
+
     Output strictly valid JSON.
-    
+
     JSON Schema:
     {
       "intent": "MODIFICATION" | "ANALYSIS",
@@ -134,7 +127,7 @@ export const processUserRequest = async (
     try {
       const response = await ai.models.generateContent({
         model: settings.modelName || 'gemini-2.5-flash',
-        contents: systemPrompt,
+        contents: `${systemContent}\n\n${contextBlock}\n\nUser Instruction: "${userInstruction}"\n\nConversation Context:\n${conversationHistory.slice(-10).join('\n')}`,
         config: {
           responseMimeType: "application/json",
           responseSchema: {
@@ -197,8 +190,15 @@ export const processUserRequest = async (
         body: JSON.stringify({
           model: settings.modelName || (settings.provider === 'glm' ? 'glm-4.6' : 'gpt-4-turbo'),
           messages: [
-            { role: "system", content: "You are a helpful legal assistant. Output valid JSON only." },
-            { role: "user", content: systemPrompt }
+            { role: "system", content: systemContent },
+            ...conversationHistory.slice(-10).map(h => {
+              const [prefix, ...rest] = h.split(':');
+              const content = rest.join(':').trim();
+              const role = (prefix || '').trim().toUpperCase() === 'AI' ? 'assistant' : 'user';
+              return { role, content };
+            }),
+            { role: "user", content: contextBlock },
+            { role: "user", content: userInstruction }
           ],
           // GLM/Zhipu supports response_format: { type: "json_object" } for some models, but safe to ask in prompt
           // Note: OpenAI strict JSON mode requires the word 'json' in the prompt, which we have.
