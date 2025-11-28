@@ -16,6 +16,41 @@ import { useSettings } from './contexts/SettingsContext';
 
 const LOCAL_STORAGE_KEY = 'lexigen_contract_draft_md';
 
+const draftIntentRegex = /(起草|草拟|生成|写一份|写一个|给我.*合同|制作.*合同|创建.*合同|draft|generate|create\s+(an|a)?\s*(contract|agreement)|write\s+(an|a)?\s*(contract|agreement))/i;
+
+const computeContractScore = (s: string): number => {
+  if (!s || typeof s !== 'string') return 0;
+  const t = s.trim();
+  if (t.length < 200) return 0;
+  const title = (t.match(/^#\s*(.+)$/m)?.[1] || '').toLowerCase();
+  const early = t.slice(0, 600);
+  const negative = /(摘要|要点|概要|概述|清单|清晰列表|Checklist|Summary|Outline|指南|说明|Q&A|常见问题|提纲|笔记|邮件|备忘录)/i;
+  if (negative.test(title) || negative.test(early)) return 0;
+  const hasContractKeyword = /(合同|协议)/.test(title) || /(agreement|contract)/i.test(title) || /(合同|协议)/.test(early);
+  const hasParties = /(甲方|乙方|双方)/.test(t) || /(Parties|Party)/i.test(t);
+  const clauseHeadings = (t.match(/^#{2,3}\s.+$/gm) || []).length;
+  const numberedClauses = (t.match(/\n\d+\.\s/g) || []).length + (t.match(/第\s*\d+\s*条/g) || []).length;
+  const typicalTerms = [
+    /(付款|支付|费用|结算|发票|payment|invoice)/i,
+    /(期限|有效期|term)/i,
+    /(终止|解除|termination)/i,
+    /(保密|机密|confidentiality|confidential)/i,
+    /(知识产权|版权|专利|intellectual\s*property)/i,
+    /(适用法律|管辖|governing\s*law|jurisdiction|争议|仲裁|arbitration)/i
+  ];
+  let termHits = 0;
+  for (const r of typicalTerms) if (r.test(t)) termHits++;
+  const lenScore = Math.min(1, t.length / 1200);
+  const kwScore = hasContractKeyword ? 1 : 0;
+  const partiesScore = hasParties ? 1 : 0;
+  const structureScore = Math.min(1, (clauseHeadings + numberedClauses) / 6);
+  const termsScore = Math.min(1, termHits / 4);
+  const score = 0.2 * lenScore + 0.2 * kwScore + 0.2 * partiesScore + 0.2 * structureScore + 0.2 * termsScore;
+  return score;
+};
+
+const isLikelyContract = (s: string): boolean => computeContractScore(s) >= 0.6;
+
 type ViewMode = 'landing' | 'editor';
 
 const App: React.FC = () => {
@@ -145,27 +180,28 @@ const App: React.FC = () => {
 
       if (response.intent === 'MODIFICATION') {
         const newMarkdown = response.content;
-        const isContractBody = (s: string): boolean => {
-          if (!s || typeof s !== 'string') return false;
-          const t = s.trim();
-          if (t.length < 300) return false;
-          const title = (t.match(/^#\s*(.+)$/m)?.[1] || '').toLowerCase();
-          const hasContractKeyword = /(合同|协议)/.test(title) || /(agreement|contract)/i.test(title);
-          const negative = /(摘要|要点|概要|概述|清单|Checklist|Summary|Outline|指南|说明|Q&A|常见问题)/i;
-          if (negative.test(title) || negative.test(t.slice(0, 400))) return false;
-          const hasParties = /(甲方|乙方|双方)/.test(t) || /(Parties|Party)/i.test(t);
-          const clauseCount = ((t.match(/^#{2,3}\s.+$/gm) || []).length) 
-                            + ((t.match(/第\s*\d+\s*条/g) || []).length) 
-                            + ((t.match(/\n\d+\.\s/g) || []).length);
-          return hasContractKeyword && hasParties && clauseCount >= 3;
-        };
+        const isDraftRequest = draftIntentRegex.test(text);
         const cleanCurrent = contractMarkdown.replace(/\s+/g, ' ').trim();
         const cleanNew = newMarkdown.replace(/\s+/g, ' ').trim();
 
-        if (!isContractBody(newMarkdown)) {
+        if (!isLikelyContract(newMarkdown)) {
           setMessages(prev => [...prev, {
             id: (Date.now() + 1).toString(),
             text: response.content,
+            sender: Sender.AI,
+            timestamp: new Date()
+          }]);
+        } else if (isDraftRequest) {
+          const prev = contractMarkdown;
+          setContractMarkdown(newMarkdown);
+          saveToStorage(newMarkdown);
+          setInitialBaselineMarkdown(prev || newMarkdown);
+          setBaselineMarkdown(newMarkdown);
+          setProposedMarkdown(null);
+          setEditorMode(EditorMode.VIEW);
+          setMessages(prevMsgs => [...prevMsgs, {
+            id: (Date.now() + 1).toString(),
+            text: t.app.changesApplied,
             sender: Sender.AI,
             timestamp: new Date()
           }]);
