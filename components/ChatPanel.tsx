@@ -122,10 +122,11 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
         </div>
         <button 
             onClick={toggleLanguage}
-            className="p-1.5 rounded-full bg-zinc-800 text-zinc-400 hover:text-zinc-200 hover:bg-zinc-700 transition-colors"
-            title="Switch Language"
+            className="flex items-center gap-1.5 px-2 py-1.5 rounded-full bg-zinc-800 text-zinc-400 hover:text-zinc-200 hover:bg-zinc-700 transition-colors"
+            title={language === 'zh' ? '语言切换' : 'Language'}
         >
             <IconGlobe className="w-4 h-4" />
+            <span className="text-[11px]">{language === 'zh' ? '语言切换' : 'Language'}</span>
         </button>
       </div>
 
